@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04%20LTS-orange.svg)](https://ubuntu.com/)
 [![Release](https://img.shields.io/badge/Release-v1.2.3-blue.svg)](https://github.com/winexee/safebox/releases)
+[![Get it from the Snap Store](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/safebox)
 
 SafeBox, Linux üzerinde güvenilmeyen dosyaları çalıştırmak, güvenli web gezintisi yapmak ve sistemi kalıntılardan korumak için Bubblewrap altyapısını kullanan hafif, izole bir MATE sanal masaüstüdür.
 
