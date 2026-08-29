@@ -1,5 +1,5 @@
 name: safebox
-version: '1.3.3'
+version: '1.3.4'
 summary: Ultra-secure, RAM-backed lightweight sandbox environment
 description: |
   SafeBox creates a volatile, fully isolated desktop sandbox with Bubblewrap.
@@ -35,3 +35,6 @@ parts:
       - gir1.2-gtk-3.0
       - bubblewrap
       - librsvg2-common
+      - xserver-xephyr
+      - dbus-x11
+      - pulseaudio-utils

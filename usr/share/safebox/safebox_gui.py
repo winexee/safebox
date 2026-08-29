@@ -10,7 +10,7 @@ import time
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.3.3"
+VERSION = "1.3.4"
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -485,7 +485,8 @@ class SafeBoxApp(Gtk.Window):
         audio = "1" if self.chk_audio.get_active() else "0"
         net = "1" if self.chk_net.get_active() else "0"
 
-        cmd = ["/usr/bin/safebox-core", str(ram), str(cpus), res, share, clip, audio, net]
+        core_path = os.path.join(os.environ.get("SNAP", ""), "usr/bin/safebox-core") if "SNAP" in os.environ else "/usr/bin/safebox-core"
+        cmd = [core_path, str(ram), str(cpus), res, share, clip, audio, net]
         threading.Thread(target=self._run_backend, args=(cmd,), daemon=True).start()
 
     def _run_backend(self, cmd):
