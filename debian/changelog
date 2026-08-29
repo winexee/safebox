@@ -1,7 +1,5 @@
-safebox (1.1.3) noble; urgency=medium
+safebox (1.2.1-1~ppa1~noble1) noble; urgency=medium
 
-  * Ubuntu Yaru-dark temasi ve simge seti varsayilan yapildi.
-  * Mantiksal cekirdek (Thread) aciklamasi netlestirildi.
-  * Arka plan terminal oturum uyarilari sessize alindi.
+  * v1.2.1: Gelişmiş hata yakalama, otomatik Xephyr soket denetimi, trap temizlik mekanizması ve güvenlik iyileştirmeleri.
 
- -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sat, 29 Aug 2026 12:30:00 +0300
+ -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sat, 29 Aug 2026 14:50:00 +0300

@@ -1,7 +1,7 @@
 f29db1e51c222f31eefae10a86be82f3  usr/bin/safebox
 bd7d62ae556ffddd268eeb619f3756d2  usr/bin/safebox-core
 18b0d4a6f720c82c8b672c890319f785  usr/share/applications/safebox.desktop
-c3601f1ba7842ddb22d200827c3395ce  usr/share/doc/safebox/changelog.gz
+0ce1ce01bd42d44916332848bb617e29  usr/share/doc/safebox/changelog.Debian.gz
 d15472f4601463a113d326c9094b7012  usr/share/icons/hicolor/scalable/apps/safebox.svg
 5e16cd63bea31b571551fec490ab9d8e  usr/share/metainfo/com.winexe.safebox.metainfo.xml
 d87cac1a2f7cf3fe3b9495981bd83062  usr/share/safebox/safebox_gui.py
