@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import gi
 import os
+import re
 import subprocess
 import threading
 import multiprocessing
@@ -9,6 +10,7 @@ import time
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
+VERSION = "1.2.2"
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -16,10 +18,10 @@ os.chmod(LOG_DIR, 0o700)
 
 class SafeBoxApp(Gtk.Window):
     def __init__(self):
-        super().__init__(title="SafeBox Kontrol Merkezi")
-        self.set_default_size(720, 560)
+        super().__init__(title=f"SafeBox Kontrol Merkezi (v{VERSION})")
+        self.set_default_size(760, 600)
         self.set_position(Gtk.WindowPosition.CENTER)
-        self.set_border_width(16)
+        self.set_border_width(14)
 
         css_provider = Gtk.CssProvider()
         css = b"""
@@ -39,8 +41,13 @@ class SafeBoxApp(Gtk.Window):
         }
         textview text {
             font-family: monospace;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
+            background-color: #181818;
+            color: #4af626;
+        }
+        .console-entry {
+            font-family: monospace;
+            background-color: #242424;
+            color: #ffffff;
         }
         """
         css_provider.load_from_data(css)
@@ -50,18 +57,19 @@ class SafeBoxApp(Gtk.Window):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.add(vbox)
 
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
+        # Üst Başlık & Sürüm Rozeti
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         icon = Gtk.Image.new_from_icon_name("security-high", Gtk.IconSize.DIALOG)
         header.pack_start(icon, False, False, 0)
 
         tbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         lbl_title = Gtk.Label()
-        lbl_title.set_markup("<span size='x-large' weight='bold' foreground='#E95420'>SafeBox Güvenli Alan</span>")
+        lbl_title.set_markup(f"<span size='x-large' weight='bold' foreground='#E95420'>SafeBox Güvenli Alan</span> <span size='small' foreground='#888888'>v{VERSION}</span>")
         lbl_title.set_halign(Gtk.Align.START)
-        lbl_sub = Gtk.Label(label="Tam izole, modern MATE sanal masaüstü ve güvenlik denetimi")
+        lbl_sub = Gtk.Label(label="MATE Sanal Masaüstü, Donanım İzolasyonu ve Teşhis Konsolu")
         lbl_sub.set_halign(Gtk.Align.START)
         tbox.pack_start(lbl_title, False, False, 0)
         tbox.pack_start(lbl_sub, False, False, 0)
@@ -70,10 +78,11 @@ class SafeBoxApp(Gtk.Window):
 
         vbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
+        # Sekmeler
         notebook = Gtk.Notebook()
         vbox.pack_start(notebook, True, True, 0)
 
-        # SEKME 1: Genel Bakış
+        # SEKME 1: Genel Bakış (5 Madde Eksiksiz ve Düzeltilmiş)
         tab1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         tab1.set_border_width(12)
         info_frame = Gtk.Frame(label=" İzolasyon Güvenlik Modeli ")
@@ -82,11 +91,11 @@ class SafeBoxApp(Gtk.Window):
         info_frame.add(info_box)
 
         items = [
-            ("<b>Kişisel Gizlilik:</b>", "Ana ev dizininiz gizlenir, 'safebox' izole kimliği atanır."),
-            ("<b>Modern MATE Arayüzü:</b>", "Yaru teması ve hafifletilmiş masaüstü deneyimi."),
-            ("<b>Geçici RAM Alanı:</b>", "İndirilen tüm veriler oturum kapandığında tamamen silinir."),
-            ("<b>Donanım Hızlandırma:</b>", "NVIDIA/DRI desteği ile 3D grafik performansı."),
-            ("<b>Sıfır Kalıntı:</b>", "Sistem dosyaları salt okunur (read-only) bağlanır.")
+            ("<b>Kişisel Gizlilik:</b>", "Ana ev dizini gizlenir, izole 'safebox' profili atanır."),
+            ("<b>Modern MATE Arayüzü:</b>", "Yaru temalı hafif masaüstü ve 5 temel araç."),
+            ("<b>Geçici RAM Alanı:</b>", "Oturum sonlandığında indirilen her şey RAM'den silinir."),
+            ("<b>Donanım Hızlandırma:</b>", "NVIDIA &amp; DRI 3D grafik hızlandırması devrededir."),
+            ("<b>Sıfır Kalıntı:</b>", "Kök dosya sistemi salt okunur (read-only) kilitlenir.")
         ]
         for t, d in items:
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -161,9 +170,20 @@ class SafeBoxApp(Gtk.Window):
         tab3.pack_start(self.chk_net, False, False, 0)
         notebook.append_page(tab3, Gtk.Label(label="İzinler ve Paylaşım"))
 
-        # SEKME 4: Canlı Güvenlik Günlüğü (Log)
-        tab_log = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        tab_log.set_border_width(12)
+        # SEKME 4: Konsol & Günlük
+        tab_log = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        tab_log.set_border_width(10)
+
+        info_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        lbl_ver_info = Gtk.Label()
+        lbl_ver_info.set_markup(f"<b>SafeBox GUI:</b> <span foreground='#00ffcc'>v{VERSION}</span> | <b>Geliştirici:</b> <span foreground='#00ffcc'>Winexe</span>")
+        lbl_ver_info.set_halign(Gtk.Align.START)
+        info_bar.pack_start(lbl_ver_info, True, True, 0)
+
+        btn_ver_check = Gtk.Button(label="📦 Paket Bilgisini Göster")
+        btn_ver_check.connect("clicked", self.check_package_version)
+        info_bar.pack_end(btn_ver_check, False, False, 0)
+        tab_log.pack_start(info_bar, False, False, 0)
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_hexpand(True)
@@ -178,12 +198,25 @@ class SafeBoxApp(Gtk.Window):
         scroll.add(self.log_view)
         tab_log.pack_start(scroll, True, True, 0)
 
-        log_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        cmd_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        lbl_prompt = Gtk.Label(label="Terminal Komutu >")
+        self.cmd_entry = Gtk.Entry()
+        self.cmd_entry.set_placeholder_text("örnek: dpkg -l safebox | bwrap --version")
+        self.cmd_entry.connect("activate", self.exec_custom_command)
+        btn_exec = Gtk.Button(label="Çalıştır")
+        btn_exec.connect("clicked", self.exec_custom_command)
+        
+        cmd_box.pack_start(lbl_prompt, False, False, 0)
+        cmd_box.pack_start(self.cmd_entry, True, True, 0)
+        cmd_box.pack_start(btn_exec, False, False, 0)
+        tab_log.pack_start(cmd_box, False, False, 0)
+
+        log_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_refresh_log = Gtk.Button(label="Yenile")
         btn_refresh_log.connect("clicked", self.load_log)
         btn_export_log = Gtk.Button(label="Dışa Aktar (.txt)")
         btn_export_log.connect("clicked", self.export_log)
-        btn_clear_log = Gtk.Button(label="Günlüğü Temizle")
+        btn_clear_log = Gtk.Button(label="Konsolu Temizle")
         btn_clear_log.connect("clicked", self.clear_log)
 
         log_btn_box.pack_start(btn_refresh_log, False, False, 0)
@@ -191,7 +224,7 @@ class SafeBoxApp(Gtk.Window):
         log_btn_box.pack_start(btn_clear_log, False, False, 0)
         tab_log.pack_start(log_btn_box, False, False, 0)
 
-        notebook.append_page(tab_log, Gtk.Label(label="Güvenlik Günlüğü"))
+        notebook.append_page(tab_log, Gtk.Label(label="Konsol & Günlük"))
         self.load_log()
 
         # Alt Butonlar
@@ -213,19 +246,43 @@ class SafeBoxApp(Gtk.Window):
         vbox.pack_end(btn_bar, False, False, 0)
 
     def load_log(self, widget=None):
+        header_text = f"=== SafeBox Konsol & Teşhis Merkezi (v{VERSION}) ===\n"
         if os.path.exists(LOG_FILE):
             try:
                 with open(LOG_FILE, "r", encoding="utf-8") as f:
                     content = f.read()
-                self.log_buffer.set_text(content)
+                self.log_buffer.set_text(header_text + content)
             except Exception as e:
-                self.log_buffer.set_text(f"[HATA] Log okunamadı: {str(e)}\n")
+                self.log_buffer.set_text(header_text + f"[HATA] Log okunamadı: {str(e)}\n")
         else:
-            self.log_buffer.set_text("[BILGI] Henüz güvenlik günlüğü oluşmadı.\n")
+            self.log_buffer.set_text(header_text + "[BİLGİ] Konsol hazır.\n")
+
+    def check_package_version(self, widget=None):
+        try:
+            res = subprocess.run(["dpkg", "-s", "safebox"], capture_output=True, text=True)
+            output = res.stdout if res.stdout else res.stderr
+            # Maintainer satırını sadece Winexe yapalım
+            output = re.sub(r'Maintainer:.*', 'Maintainer: Winexe', output)
+            self.log_buffer.insert_at_cursor(f"\n\n[SİSTEM PAKET DENETİMİ]:\n{output}\n")
+        except Exception as e:
+            self.log_buffer.insert_at_cursor(f"\n[HATA] Paket sorgulanamadı: {str(e)}\n")
+
+    def exec_custom_command(self, widget=None):
+        cmd = self.cmd_entry.get_text().strip()
+        if not cmd:
+            return
+        self.log_buffer.insert_at_cursor(f"\n\n$ {cmd}\n")
+        try:
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+            out = res.stdout + res.stderr
+            self.log_buffer.insert_at_cursor(out if out else "[Komut başarıyla çalıştı, çıktı yok]\n")
+        except Exception as e:
+            self.log_buffer.insert_at_cursor(f"[HATA] {str(e)}\n")
+        self.cmd_entry.set_text("")
 
     def export_log(self, widget=None):
         dialog = Gtk.FileChooserDialog(
-            title="Güvenlik Günlüğünü Kaydet",
+            title="Konsol Günlüğünü Kaydet",
             parent=self,
             action=Gtk.FileChooserAction.SAVE
         )
@@ -233,7 +290,7 @@ class SafeBoxApp(Gtk.Window):
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
             Gtk.STOCK_SAVE, Gtk.ResponseType.OK
         )
-        dialog.set_current_name("safebox_guvenlik_gunlugu.txt")
+        dialog.set_current_name(f"safebox_v{VERSION}_gunluk.txt")
         dialog.set_do_overwrite_confirmation(True)
 
         if dialog.run() == Gtk.ResponseType.OK:
@@ -249,21 +306,12 @@ class SafeBoxApp(Gtk.Window):
         dialog.destroy()
 
     def clear_log(self, widget=None):
-        dialog = Gtk.MessageDialog(
-            self,
-            Gtk.DialogFlags.MODAL,
-            Gtk.MessageType.QUESTION,
-            Gtk.ButtonsType.YES_NO,
-            "Günlüğü temizlemek istediğinize emin misiniz?"
-        )
-        if dialog.run() == Gtk.ResponseType.YES:
-            try:
-                with open(LOG_FILE, "w", encoding="utf-8") as f:
-                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Güvenlik günlüğü sıfırlandı.\n")
-                self.load_log()
-            except Exception as e:
-                self._show_error("Hata", f"Günlük temizlenemedi: {str(e)}")
-        dialog.destroy()
+        try:
+            with open(LOG_FILE, "w", encoding="utf-8") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Konsol günlüğü sıfırlandı.\n")
+            self.load_log()
+        except Exception as e:
+            self._show_error("Hata", f"Günlük temizlenemedi: {str(e)}")
 
     def _show_error(self, title, message):
         dialog = Gtk.MessageDialog(

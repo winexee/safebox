@@ -1,5 +1,5 @@
-safebox (1.2.2-1~ppa1~noble1) noble; urgency=medium
+safebox (1.2.3-1~ppa1~noble1) noble; urgency=medium
 
-  * v1.2.2: Hata yönetimi, trap temizliği, mktemp denetimi ve Xephyr doğrulaması eklendi.
+  * v1.2.3: Teşhis konsolu entegrasyonu, XML &amp; karakter düzeltmesi ve Winexe yayıncı optimizasyonu.
 
- -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sat, 29 Aug 2026 15:30:00 +0300
+ -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sat, 29 Aug 2026 15:45:00 +0300
