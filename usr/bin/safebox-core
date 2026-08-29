@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Engine (v1.5.1)
+# SafeBox Engine (v1.5.2)
 set -e
 
 RAM_GB="${1:-4}"
@@ -30,7 +30,7 @@ if [ -z "$TARGET_DISP" ]; then
 fi
 echo "[BİLGİ] Sanal X11 Display atandı: $TARGET_DISP" >> "$ENGINE_LOG"
 
-# Xephyr Ekranı
+# Xephyr Ekranını Başlat
 Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Virtual Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
@@ -107,8 +107,8 @@ if [ "$SHARE_FOLDER" = "1" ]; then
     BWRAP_ARGS+=(--bind "${HOME}/SafeBox-Paylasim" "/home/safebox/Paylasim")
 fi
 
-# X11 Socket
+# X11 Soketi
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
 
-# Çalıştır
-bwrap "${BWRAP_ARGS[@]}" /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || true
+# İzole DBus ile Çalıştır
+bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || true
