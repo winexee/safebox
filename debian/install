@@ -1,0 +1,6 @@
+usr/bin/safebox /usr/bin/
+usr/bin/safebox-core /usr/bin/
+usr/share/safebox/safebox_gui.py /usr/share/safebox/
+usr/share/applications/safebox.desktop /usr/share/applications/
+usr/share/icons/hicolor/scalable/apps/safebox.svg /usr/share/icons/hicolor/scalable/apps/
+usr/share/metainfo/com.winexe.safebox.metainfo.xml /usr/share/metainfo/

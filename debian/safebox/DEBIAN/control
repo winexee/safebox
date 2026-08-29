@@ -1,0 +1,11 @@
+Package: safebox
+Version: 1.1.3
+Architecture: all
+Maintainer: Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>
+Installed-Size: 38
+Depends: bubblewrap, xfce4, xfce4-session, xserver-xephyr, dbus-x11, python3, python3-gi, gir1.2-gtk-3.0, libnotify-bin
+Section: utils
+Priority: optional
+Homepage: https://launchpad.net/~winexe
+Description: Izole ve guvenli sanal alan ortami
+ SafeBox, bubblewrap altyapisi ile guvenli ve izole bir masaustu sunar.

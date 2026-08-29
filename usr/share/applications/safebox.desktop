@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=SafeBox
+GenericName=Guvenli Sanal Alan
+Comment=Izole ve guvenli sanal masaustu ortami
+Exec=safebox
+Icon=safebox
+Terminal=false
+Categories=Utility;Security;System;
+Keywords=sandbox;guvenlik;izolasyon;safebox;
