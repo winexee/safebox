@@ -1,4 +1,6 @@
 #!/bin/bash
+# SafeBox Core - Bubblewrap Tabanlı İzole Sanal Masaüstü
+
 RAM_GB=${1:-4}
 CPU_COUNT=${2:-4}
 SCREEN_RES=${3:-"1366x768"}
@@ -10,19 +12,46 @@ NET=${7:-"1"}
 LOG_DIR="$HOME/.local/share/safebox"
 LOG_FILE="$LOG_DIR/safebox.log"
 mkdir -p "$LOG_DIR"
+chmod 700 "$LOG_DIR"
 
 log() {
   echo "[$(date "+%Y-%m-%d %H:%M:%S")] $1" >> "$LOG_FILE"
 }
 
+cleanup() {
+  log "[KAPANIŞ] Temizlik işlemi başlatılıyor..."
+  if [ -n "$XEPHYR_PID" ] && kill -0 "$XEPHYR_PID" 2>/dev/null; then
+    kill "$XEPHYR_PID" 2>/dev/null
+    sleep 1
+    kill -9 "$XEPHYR_PID" 2>/dev/null || true
+  fi
+  for dir in "$SANDBOX_HOME" "$SANDBOX_TMP" "$SANDBOX_RUN" "$SANDBOX_ETC" "$SANDBOX_APPS"; do
+    [ -d "$dir" ] && rm -rf "$dir" 2>/dev/null
+  done
+  log "[✓] Tüm geçici RAM diskleri silindi. Oturum güvenle kapandı."
+  log "========================================================="
+}
+trap cleanup EXIT
+
+log "========================================================="
 log "=== SafeBox MATE İzole Oturumu Başlatılıyor ==="
 log "Sistem Parametreleri: RAM=${RAM_GB}GB, CPU=${CPU_COUNT} Thread, Çözünürlük=${SCREEN_RES}"
 
-SANDBOX_HOME=$(mktemp -d /tmp/safebox_home_XXXXXX)
-SANDBOX_TMP=$(mktemp -d /tmp/safebox_tmp_XXXXXX)
-SANDBOX_RUN=$(mktemp -d /tmp/safebox_run_XXXXXX)
-SANDBOX_ETC=$(mktemp -d /tmp/safebox_etc_XXXXXX)
-SANDBOX_APPS=$(mktemp -d /tmp/safebox_apps_XXXXXX)
+create_temp_dir() {
+  local dir
+  dir=$(mktemp -d /tmp/safebox_${1}_XXXXXX 2>/dev/null)
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    log "[HATA] Geçici dizin oluşturulamadı: $1 (/tmp yeterli mi?)"
+    return 1
+  fi
+  echo "$dir"
+}
+
+SANDBOX_HOME=$(create_temp_dir "home") || exit 1
+SANDBOX_TMP=$(create_temp_dir "tmp") || exit 1
+SANDBOX_RUN=$(create_temp_dir "run") || exit 1
+SANDBOX_ETC=$(create_temp_dir "etc") || exit 1
+SANDBOX_APPS=$(create_temp_dir "apps") || exit 1
 
 mkdir -p "$SANDBOX_RUN/user/1000"
 chmod 700 "$SANDBOX_RUN/user/1000"
@@ -33,9 +62,7 @@ echo "safebox:x:1000:" > "$SANDBOX_ETC/group"
 mkdir -p "$SANDBOX_HOME/Desktop" "$SANDBOX_HOME/Downloads" "$SANDBOX_HOME/Documents"
 mkdir -p "$SANDBOX_HOME/.config/gtk-3.0" "$SANDBOX_HOME/.config/dconf" "$SANDBOX_HOME/.local/share/applications"
 
-# 1. Yalnızca İstenen 5 Temel Uygulama
-
-# Firefox
+# 5 Temel Uygulama
 cat << 'APP' > "$SANDBOX_APPS/firefox.desktop"
 [Desktop Entry]
 Version=1.0
@@ -47,7 +74,6 @@ Type=Application
 Categories=Network;WebBrowser;
 APP
 
-# Caja Dosya Yöneticisi
 cat << 'APP' > "$SANDBOX_APPS/caja.desktop"
 [Desktop Entry]
 Version=1.0
@@ -59,7 +85,6 @@ Type=Application
 Categories=System;FileManager;
 APP
 
-# MATE Uçbirim
 cat << 'APP' > "$SANDBOX_APPS/mate-terminal.desktop"
 [Desktop Entry]
 Version=1.0
@@ -71,7 +96,6 @@ Type=Application
 Categories=System;TerminalEmulator;
 APP
 
-# Resim Görüntüleyici (Eye of MATE)
 cat << 'APP' > "$SANDBOX_APPS/eom.desktop"
 [Desktop Entry]
 Version=1.0
@@ -83,9 +107,18 @@ Type=Application
 Categories=Graphics;Viewer;
 APP
 
-# Video Oynatıcı
-VIDEO_BIN=$(which celluloid totem mpv vlc 2>/dev/null | head -n1)
-VIDEO_CMD=${VIDEO_BIN:-"celluloid"}
+find_video_player() {
+  for candidate in celluloid totem mpv vlc; do
+    if command -v "$candidate" &>/dev/null; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  log "[⚠] Video oynatıcı bulunamadı, celluloid fallback'i kullanılacak"
+  echo "celluloid"
+}
+
+VIDEO_CMD=$(find_video_player)
 cat << APP > "$SANDBOX_APPS/video.desktop"
 [Desktop Entry]
 Version=1.0
@@ -97,12 +130,11 @@ Type=Application
 Categories=AudioVideo;Player;
 APP
 
-# Kısayolları masaüstüne ve yerel havuza yerleştir
 cp "$SANDBOX_APPS/"*.desktop "$SANDBOX_HOME/.local/share/applications/"
 cp "$SANDBOX_APPS/"*.desktop "$SANDBOX_HOME/Desktop/"
 chmod +x "$SANDBOX_HOME/Desktop/"*.desktop "$SANDBOX_APPS/"*.desktop
 
-# GTK3 Yaru-dark Modern Tema
+# GTK3 Tema
 cat << CFG > "$SANDBOX_HOME/.config/gtk-3.0/settings.ini"
 [Settings]
 gtk-theme-name=Yaru-dark
@@ -125,13 +157,18 @@ if [ "$SHARE_FOLDER" = "1" ]; then
   mkdir -p "$SANDBOX_HOME/Paylasilan-Klasor"
   EXTRA_BINDS+=(--bind "$REAL_SHARE" "$SANDBOX_HOME/Paylasilan-Klasor")
   ln -s /home/safebox/Paylasilan-Klasor "$SANDBOX_HOME/Desktop/Paylaşılan Klasör" 2>/dev/null
-  log "[KÖPRÜ] Paylaşılan klasör bağlandı: ~/SafeBox-Paylasim -> ~/Paylasilan-Klasor"
+  log "[KÖPRÜ] Paylaşılan klasör bağlandı."
+fi
+
+if [ -z "$XDG_RUNTIME_DIR" ]; then
+  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+  log "[INFO] XDG_RUNTIME_DIR tanımlandı: $XDG_RUNTIME_DIR"
 fi
 
 if [ "$AUDIO" = "1" ]; then
   EXTRA_BINDS+=(--ro-bind-try "$XDG_RUNTIME_DIR/pulse" "$XDG_RUNTIME_DIR/pulse")
   EXTRA_BINDS+=(--ro-bind-try "$XDG_RUNTIME_DIR/pipewire-0" "$XDG_RUNTIME_DIR/pipewire-0")
-  log "[SES] Ses soketleri aktarıldı."
+  log "[SES] Ses aktarımı etkin."
 fi
 
 NET_FLAG="--unshare-net"
@@ -139,43 +176,44 @@ if [ "$NET" = "1" ]; then
   NET_FLAG="--share-net"
   log "[AĞ] İnternet erişimi etkin."
 else
-  log "[AĞ] Ağ tamamen izole edildi (Air-Gapped)."
+  log "[AĞ] Ağ tamamen izole edildi."
 fi
 
 NVIDIA_FLAGS=()
 for dev in /dev/nvidia*; do
-  if [ -e "$dev" ]; then
-    NVIDIA_FLAGS+=(--dev-bind-try "$dev" "$dev")
-  fi
+  [ -e "$dev" ] && NVIDIA_FLAGS+=(--dev-bind-try "$dev" "$dev")
 done
 
 SANDBOX_DISPLAY=":100"
 
-Xephyr -br -ac -noreset -extension MIT-SHM -screen "$SCREEN_RES" -title "SafeBox - Guvenli Sanal Alan ($SCREEN_RES)" "$SANDBOX_DISPLAY" 2>/dev/null &
+log "[EKRAN] Xephyr başlatılıyor ($SANDBOX_DISPLAY)..."
+Xephyr -br -ac -noreset -extension MIT-SHM -screen "$SCREEN_RES" \
+  -title "SafeBox ($SCREEN_RES)" "$SANDBOX_DISPLAY" 2>/dev/null &
 XEPHYR_PID=$!
-log "[EKRAN] Xephyr Sanal X Sunucusu ($SANDBOX_DISPLAY) açıldı (PID: $XEPHYR_PID)."
 
 sleep 1
+if ! kill -0 "$XEPHYR_PID" 2>/dev/null; then
+  log "[HATA] Xephyr başlatılamadı!"
+  exit 1
+fi
+log "[✓] Xephyr başlatıldı (PID: $XEPHYR_PID)"
 
 cat << 'STARTUP' > "$SANDBOX_HOME/.xinitrc"
 #!/bin/bash
 export XDG_CURRENT_DESKTOP="MATE"
 export XDG_DATA_DIRS=/usr/share/mate:/usr/local/share/:/usr/share/
 export GDK_SYNCHRONIZE=1
-
 for f in /home/safebox/Desktop/*.desktop; do
   gio set "$f" metadata::trusted true 2>/dev/null || true
 done
-
 marco --replace &
 caja --no-default-window &
 mate-panel &
-
 wait
 STARTUP
 chmod +x "$SANDBOX_HOME/.xinitrc"
 
-log "[İZOLE KATMAN] Menüsüz, sade ve tam izole MATE Masaüstü başlatılıyor..."
+log "[İZOLE] Masaüstü başlatılıyor..."
 
 bwrap \
   --ro-bind /usr /usr \
@@ -217,8 +255,5 @@ bwrap \
   --setenv DISPLAY "$SANDBOX_DISPLAY" \
   dbus-run-session -- /home/safebox/.xinitrc 2>/dev/null
 
-log "[KAPANIŞ] Sanal alan sonlandırıldı. Geçici RAM alanları temizleniyor..."
-kill "$XEPHYR_PID" 2>/dev/null
-rm -rf "$SANDBOX_HOME" "$SANDBOX_TMP" "$SANDBOX_RUN" "$SANDBOX_ETC" "$SANDBOX_APPS"
-log "[KAPANIŞ] Tüm geçici RAM diskleri ve artıklar sıfırlandı. Oturum güvenle kapandı."
-log "========================================================="
+log "[İZOLE] Sanal alan oturumu sona erdi."
+exit 0

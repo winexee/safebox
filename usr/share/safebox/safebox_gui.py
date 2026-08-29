@@ -12,6 +12,7 @@ from gi.repository import Gtk, Gdk, GLib
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
+os.chmod(LOG_DIR, 0o700)
 
 class SafeBoxApp(Gtk.Window):
     def __init__(self):
@@ -52,7 +53,6 @@ class SafeBoxApp(Gtk.Window):
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         self.add(vbox)
 
-        # Üst Başlık
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
         icon = Gtk.Image.new_from_icon_name("security-high", Gtk.IconSize.DIALOG)
         header.pack_start(icon, False, False, 0)
@@ -70,7 +70,6 @@ class SafeBoxApp(Gtk.Window):
 
         vbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
-        # Sekmeler
         notebook = Gtk.Notebook()
         vbox.pack_start(notebook, True, True, 0)
 
@@ -84,10 +83,10 @@ class SafeBoxApp(Gtk.Window):
 
         items = [
             ("<b>Kişisel Gizlilik:</b>", "Ana ev dizininiz gizlenir, 'safebox' izole kimliği atanır."),
-            ("<b>Modern MATE Arayüzü:</b>", "Şık Yaru teması, Caja dosya yöneticisi ve Brisk menü."),
+            ("<b>Modern MATE Arayüzü:</b>", "Yaru teması ve hafifletilmiş masaüstü deneyimi."),
             ("<b>Geçici RAM Alanı:</b>", "İndirilen tüm veriler oturum kapandığında tamamen silinir."),
-            ("<b>Donanım Hızlandırma:</b>", "NVIDIA/DRI desteği ile tam 3D grafik performansı."),
-            ("<b>Sıfır Kalıntı:</b>", "Sistem dosyaları salt okunur (read-only) bağlanır, sistem bozulamaz.")
+            ("<b>Donanım Hızlandırma:</b>", "NVIDIA/DRI desteği ile 3D grafik performansı."),
+            ("<b>Sıfır Kalıntı:</b>", "Sistem dosyaları salt okunur (read-only) bağlanır.")
         ]
         for t, d in items:
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -215,11 +214,14 @@ class SafeBoxApp(Gtk.Window):
 
     def load_log(self, widget=None):
         if os.path.exists(LOG_FILE):
-            with open(LOG_FILE, "r", encoding="utf-8") as f:
-                content = f.read()
-            self.log_buffer.set_text(content)
+            try:
+                with open(LOG_FILE, "r", encoding="utf-8") as f:
+                    content = f.read()
+                self.log_buffer.set_text(content)
+            except Exception as e:
+                self.log_buffer.set_text(f"[HATA] Log okunamadı: {str(e)}\n")
         else:
-            self.log_buffer.set_text("[BILGI] Henuz bir guvenlik gunlugu olusmadi.\n")
+            self.log_buffer.set_text("[BILGI] Henüz güvenlik günlüğü oluşmadı.\n")
 
     def export_log(self, widget=None):
         dialog = Gtk.FileChooserDialog(
@@ -236,18 +238,44 @@ class SafeBoxApp(Gtk.Window):
 
         if dialog.run() == Gtk.ResponseType.OK:
             target_path = dialog.get_filename()
-            start_iter = self.log_buffer.get_start_iter()
-            end_iter = self.log_buffer.get_end_iter()
-            text = self.log_buffer.get_text(start_iter, end_iter, True)
-            with open(target_path, "w", encoding="utf-8") as f:
-                f.write(text)
+            try:
+                start_iter = self.log_buffer.get_start_iter()
+                end_iter = self.log_buffer.get_end_iter()
+                text = self.log_buffer.get_text(start_iter, end_iter, True)
+                with open(target_path, "w", encoding="utf-8") as f:
+                    f.write(text)
+            except Exception as e:
+                self._show_error("Hata", f"Dışa aktarma hatası: {str(e)}")
         dialog.destroy()
 
     def clear_log(self, widget=None):
-        if os.path.exists(LOG_FILE):
-            with open(LOG_FILE, "w", encoding="utf-8") as f:
-                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Guvenlik gunlugu sifirlandi.\n")
-        self.load_log()
+        dialog = Gtk.MessageDialog(
+            self,
+            Gtk.DialogFlags.MODAL,
+            Gtk.MessageType.QUESTION,
+            Gtk.ButtonsType.YES_NO,
+            "Günlüğü temizlemek istediğinize emin misiniz?"
+        )
+        if dialog.run() == Gtk.ResponseType.YES:
+            try:
+                with open(LOG_FILE, "w", encoding="utf-8") as f:
+                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Güvenlik günlüğü sıfırlandı.\n")
+                self.load_log()
+            except Exception as e:
+                self._show_error("Hata", f"Günlük temizlenemedi: {str(e)}")
+        dialog.destroy()
+
+    def _show_error(self, title, message):
+        dialog = Gtk.MessageDialog(
+            self,
+            Gtk.DialogFlags.MODAL,
+            Gtk.MessageType.ERROR,
+            Gtk.ButtonsType.OK,
+            title
+        )
+        dialog.format_secondary_text(message)
+        dialog.run()
+        dialog.destroy()
 
     def launch_sandbox(self, widget):
         self.hide()
@@ -263,8 +291,17 @@ class SafeBoxApp(Gtk.Window):
         threading.Thread(target=self._run_backend, args=(cmd,), daemon=True).start()
 
     def _run_backend(self, cmd):
-        subprocess.run(cmd)
-        GLib.idle_add(Gtk.main_quit)
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            GLib.idle_add(self._show_error, "Sanal Alan Hatası", 
+                          f"SafeBox çalıştırılırken hata oluştu.\nÇıkış kodu: {e.returncode}")
+        except FileNotFoundError:
+            GLib.idle_add(self._show_error, "Hata", "/usr/bin/safebox-core bulunamadı!")
+        except Exception as e:
+            GLib.idle_add(self._show_error, "Hata", str(e))
+        finally:
+            GLib.idle_add(Gtk.main_quit)
 
 win = SafeBoxApp()
 win.connect("destroy", Gtk.main_quit)
