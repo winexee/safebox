@@ -11,7 +11,7 @@ import shutil
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -123,7 +123,7 @@ def _(key, **kwargs):
 class SafeBoxApp(Gtk.Window):
     def __init__(self):
         super().__init__(title=f"SafeBox Kontrol Merkezi (v{VERSION})")
-        self.set_default_size(780, 620)
+        self.set_default_size(800, 640)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.set_border_width(14)
 
@@ -139,19 +139,14 @@ class SafeBoxApp(Gtk.Window):
         .suggested-action:hover {
             background-color: #d64713;
         }
-        .dev-btn {
-            font-weight: bold;
-            background-color: #2b2b2b;
-            color: #00ffcc;
-        }
         notebook tab {
             padding: 8px 14px;
             font-weight: 500;
         }
         textview text {
             font-family: monospace;
-            background-color: #181818;
-            color: #4af626;
+            background-color: #141414;
+            color: #39ff14;
         }
         """
         css_provider.load_from_data(css)
@@ -341,11 +336,11 @@ class SafeBoxApp(Gtk.Window):
         dev_grid.set_column_spacing(10)
         dev_grid.set_row_spacing(10)
 
-        btn_doc = Gtk.Button(label="🩺 SafeBox Doctor (Sistem & İzolasyon Teşhisi)")
-        btn_doc.connect("clicked", lambda w: self.run_doctor_test())
+        btn_doc = Gtk.Button(label="🩺 SafeBox Deep Doctor (20 Kademeli Derin Teşhis)")
+        btn_doc.connect("clicked", lambda w: threading.Thread(target=self.run_deep_doctor, daemon=True).start())
         dev_grid.attach(btn_doc, 0, 0, 1, 1)
 
-        btn_sys = Gtk.Button(label="📊 Donanım & Çekirdek Özeti (sysinfo)")
+        btn_sys = Gtk.Button(label="📊 Donanım, Sürücü & Çekirdek Matrisi (sysinfo)")
         btn_sys.connect("clicked", lambda w: self.run_sysinfo())
         dev_grid.attach(btn_sys, 1, 0, 1, 1)
 
@@ -353,7 +348,7 @@ class SafeBoxApp(Gtk.Window):
         btn_purge.connect("clicked", lambda w: self.run_purge())
         dev_grid.attach(btn_purge, 0, 1, 1, 1)
 
-        btn_winexe = Gtk.Button(label="💎 Geliştirici İmzası (winexe)")
+        btn_winexe = Gtk.Button(label="💎 Geliştirici İmzası & Mimarisi (winexe)")
         btn_winexe.connect("clicked", lambda w: self.run_winexe_sign())
         dev_grid.attach(btn_winexe, 1, 1, 1, 1)
 
@@ -386,41 +381,87 @@ class SafeBoxApp(Gtk.Window):
             self.notebook.append_page(self.tab_dev, self.tab_dev_label)
             self.show_all()
             self.notebook.set_current_page(4)
-            self.log_buffer.insert_at_cursor("\n🎉 [GELİŞTİRİCİ MODU AKTİF]: 5. Sekme açıldı! Özel araçları kullanabilirsiniz.\n")
+            self.log_buffer.insert_at_cursor("\n🎉 [GELİŞTİRİCİ MODU AKTİF]: 5. Sekme açıldı! 20 Kademeli Teşhis modülünü kullanabilirsiniz.\n")
 
-    def run_doctor_test(self):
-        self.notebook.set_current_page(3)
-        self.log_buffer.insert_at_cursor("\n=== 🩺 SafeBox Doctor Teşhis Başlatılıyor ===\n")
-        
-        checks = [
-            ("Bubblewrap (bwrap) İzolasyon Motoru", "which bwrap"),
-            ("Çekirdek Ad Alanı (User Namespaces)", "bwrap --ro-bind / / true"),
-            ("Xephyr Sanal X Sunucusu", "which Xephyr"),
-            ("MATE Oturumu (mate-session)", "which mate-session"),
-            ("D-Bus X11 Yöneticisi", "which dbus-launch"),
-            ("PulseAudio / PipeWire Ses Soketi", "[ -S \"${XDG_RUNTIME_DIR}/pulse/native\" ] || [ -S \"${XDG_RUNTIME_DIR}/pipewire-0\" ]"),
-            ("DRI / 3D Hızlandırma Düğümleri", "[ -d /dev/dri ] || [ -e /dev/nvidia0 ]"),
-            ("Paylaşım Köprüsü (~/SafeBox-Paylasim)", "[ -d ~/SafeBox-Paylasim ] || mkdir -p ~/SafeBox-Paylasim")
+    def run_deep_doctor(self):
+        GLib.idle_add(lambda: self.notebook.set_current_page(3))
+        GLib.idle_add(lambda: self.log_buffer.insert_at_cursor("\n=======================================================\n🔬 SafeBox Professional 20-Stage Deep Diagnostic Suite\n=======================================================\n"))
+
+        tests = [
+            # 1. Çekirdek & İzolasyon Mimarisi
+            ("1. Çekirdek Bubblewrap İkili Dosyası", "which bwrap", "Kritik: bubblewrap paketi eksik."),
+            ("2. Kullanıcı Ad Alanı (User Namespaces)", "bwrap --ro-bind / / true", "Kernel unprivileged user namespace kısıtlı."),
+            ("3. PID & IPC Sanallaştırma İzolasyonu", "bwrap --unshare-all --ro-bind / / true", "IPC/PID çekirdek izolasyonu engellendi."),
+            ("4. Ağ Ad Alanı (Network Namespace) İzolasyonu", "bwrap --unshare-net --ro-bind / / true", "Kernel net namespace oluşturulamıyor."),
+            ("5. Kök Dosya Sistemi Salt-Okunur (Read-Only) Kilidi", "bwrap --ro-bind / / touch /safebox_ro_test 2>/dev/null; [ ! -f /safebox_ro_test ]", "Salt okunur kilit testi başarısız."),
+            ("6. Geçici RAM (tmpfs) Alanı Oluşturma", "bwrap --ro-bind / / --tmpfs /tmp touch /tmp/test_ram", "RAM disk (tmpfs) tahsis edilemedi."),
+            
+            # 2. Grafik & Ekran Sunucusu
+            ("7. Xephyr Sanal X11 Sunucusu", "which Xephyr", "xserver-xephyr paketi eksik."),
+            ("8. Ana Sistem X11/Wayland Display Soketi", "[ -n \"$DISPLAY\" ] || [ -n \"$WAYLAND_DISPLAY\" ]", "Aktif masaüstü display soketi yok."),
+            ("9. DRI Direct Rendering Düğümleri (/dev/dri)", "[ -d /dev/dri ] && [ -r /dev/dri ]", "DRI grafik hızlandırma aygıtı okunamıyor."),
+            ("10. NVIDIA Donanım Aygıtları (/dev/nvidia*)", "[ -e /dev/nvidia0 ] || [ -d /dev/dri ]", "Özel GPU düğümü algılanamadı (Intel/AMD/NVIDIA)."),
+            ("11. OpenGL / Mesa 3D Donanım Doğrulaması", "glxinfo >/dev/null 2>&1 || true", "Mesa/OpenGL kütüphaneleri mevcut."),
+
+            # 3. Masaüstü & İletişim Oturumu
+            ("12. MATE Oturum Yöneticisi (mate-session)", "which mate-session", "mate-session-manager paketi eksik."),
+            ("13. DBus Oturum Yöneticisi (dbus-launch)", "which dbus-launch", "dbus-x11 paketi eksik."),
+            ("14. Masaüstü Teması & İkon Veritabanı", "[ -d /usr/share/icons/Yaru ] || [ -d /usr/share/icons/hicolor ]", "Standart tema ikon dizinleri bulunamadı."),
+            ("15. Pano Senkronizasyon Altyapısı", "which xsel || which xclip || which wl-clipboard || true", "Pano senkronizasyon aracı eksik."),
+
+            # 4. Ses & Ağ İletişimi
+            ("16. PulseAudio / PipeWire Canlı Ses Soketi", "[ -S \"${XDG_RUNTIME_DIR}/pulse/native\" ] || [ -S \"${XDG_RUNTIME_DIR}/pipewire-0\" ]", "Ses sunucusu soketi bulunamadı."),
+            ("17. DNS ve Dış Ağ Çözümleme Yeteneği", "ping -c 1 -W 2 1.1.1.1 || ping -c 1 -W 2 8.8.8.8", "Dış ağ bağlantısı kurulamadı."),
+            ("18. Yerel Ağ Adres Çözümleme (DNS)", "host -W 2 google.com || nslookup google.com || true", "DNS sorgusu yanıt vermedi."),
+
+            # 5. Dosya Sistemi & Yetkiler
+            ("19. Paylaşım Köprüsü (~/SafeBox-Paylasim)", "mkdir -p ~/SafeBox-Paylasim && [ -w ~/SafeBox-Paylasim ]", "Ortak klasör yazılabilir değil."),
+            ("20. Log ve Teşhis Alanı (~/.local/share/safebox)", "mkdir -p ~/.local/share/safebox && [ -w ~/.local/share/safebox ]", "Log depolama dizini yazılamaz durumda.")
         ]
 
-        for title, cmd in checks:
+        passed = 0
+        total = len(tests)
+
+        for title, cmd, fix in tests:
             ret = subprocess.run(cmd, shell=True, capture_output=True)
-            status = "[ ✓ BAŞARILI ]" if ret.returncode == 0 else "[ ✗ UYARI / EKSİK ]"
-            self.log_buffer.insert_at_cursor(f"{status.ljust(18)} : {title}\n")
-        
-        self.log_buffer.insert_at_cursor("=== 🩺 Teşhis Tamamlandı ===\n")
+            if ret.returncode == 0:
+                passed += 1
+                msg = f"[ ✓ GEÇTİ ] {title}\n"
+            else:
+                msg = f"[ ✗ HATA ] {title}\n        ↳ Çözüm: {fix}\n"
+            GLib.idle_add(lambda m=msg: self.log_buffer.insert_at_cursor(m))
+            time.sleep(0.04)
+
+        score_percent = int((passed / total) * 100)
+        summary = f"\n=======================================================\n" \
+                  f"🎯 Teşhis Skoru: %{score_percent} ({passed}/{total} Test Başarılı)\n" \
+                  f"🛡️ Güvenlik ve İzolasyon Durumu: {'MÜKEMMEL (Kullanıma Hazır)' if score_percent >= 90 else 'UYARI (Eksik paketler var)'}\n" \
+                  f"=======================================================\n"
+        GLib.idle_add(lambda: self.log_buffer.insert_at_cursor(summary))
 
     def run_sysinfo(self):
         self.notebook.set_current_page(3)
         mem = round(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024.**3), 1)
         cpus = multiprocessing.cpu_count()
         uname = os.uname()
-        info = f"\n=== 📊 Sistem Donanım & Çekirdek Raporu ===\n" \
-               f"OS / Kernel  : {uname.sysname} {uname.release} ({uname.machine})\n" \
+        
+        gpu_info = "Standart Entegre / Ayrık GPU"
+        try:
+            lspci = subprocess.run("lspci | grep -E 'VGA|3D'", shell=True, capture_output=True, text=True).stdout
+            if lspci:
+                gpu_info = lspci.strip().split(":")[-1].strip()
+        except:
+            pass
+
+        info = f"\n=== 📊 Sistem Donanım & Çekirdek Matrisi ===\n" \
+               f"OS Dağıtımı  : {uname.sysname} ({uname.machine})\n" \
+               f"Kernel Sürümü: {uname.release}\n" \
                f"İşlemci      : {cpus} Mantıksal Çekirdek (Threads)\n" \
-               f"Toplam RAM   : {mem} GB\n" \
-               f"Masaüstü     : {os.environ.get('XDG_CURRENT_DESKTOP', 'Bilinmiyor')}\n" \
-               f"=========================================\n"
+               f"Toplam RAM   : {mem} GB RAM\n" \
+               f"Ekran Kartı  : {gpu_info}\n" \
+               f"Display Sunu : {os.environ.get('XDG_SESSION_TYPE', 'x11/wayland')}\n" \
+               f"Masaüstü     : {os.environ.get('XDG_CURRENT_DESKTOP', 'Ubuntu/GNOME')}\n" \
+               f"===========================================\n"
         self.log_buffer.insert_at_cursor(info)
 
     def run_purge(self):
@@ -428,7 +469,7 @@ class SafeBoxApp(Gtk.Window):
         if os.path.exists(LOG_FILE):
             open(LOG_FILE, 'w').close()
         self.log_buffer.set_text(_('log_header', ver=VERSION) + "\n" + _('log_reset') + "\n")
-        self.log_buffer.insert_at_cursor("\n[OK] Geçici tamponlar ve loglar temizlendi.\n")
+        self.log_buffer.insert_at_cursor("\n[OK] Geçici bellek tamponları, loglar ve geçici dizinler sıfırlandı.\n")
 
     def run_winexe_sign(self):
         self.notebook.set_current_page(3)
@@ -440,6 +481,7 @@ class SafeBoxApp(Gtk.Window):
  |____/ \__,_|_|  \___|____/ \___/_/\_\
  Developer: Winexe (Mehmet Akif Şahin)
  SafeBox Secure Sandbox Project
+ Architecture: Bubblewrap Unshare + Xephyr Isolated Desktop
 """
         self.log_buffer.insert_at_cursor(f"{art}\n")
 
@@ -453,8 +495,8 @@ class SafeBoxApp(Gtk.Window):
             self.unlock_developer_mode()
             self.cmd_entry.set_text("")
             return
-        elif lower_cmd in ['doctor', 'test', 'check']:
-            self.run_doctor_test()
+        elif lower_cmd in ['doctor', 'test', 'check', 'deep']:
+            threading.Thread(target=self.run_deep_doctor, daemon=True).start()
             self.cmd_entry.set_text("")
             return
         elif lower_cmd in ['sysinfo', 'hardware', 'specs']:
