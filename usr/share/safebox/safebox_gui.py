@@ -11,7 +11,7 @@ import shutil
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -64,7 +64,32 @@ LANGUAGES = {
         'log_ready': '[BİLGİ] Konsol hazır. Geliştirici modu için "developer" yazın.',
         'log_reset': 'Konsol günlüğü sıfırlandı.',
         'pkg_check_title': '[SİSTEM PAKET DENETİMİ]:',
-        'lang_btn': '🌐 EN'
+        'lang_btn': '🌐 EN',
+        'dev_active_msg': '\n🎉 [GELİŞTİRİCİ MODU AKTİF]: 5. Sekme açıldı! 20 Kademeli Teşhis modülünü kullanabilirsiniz.\n',
+        'btn_dev_doc': '🩺 SafeBox Deep Doctor (20 Kademeli Derin Teşhis)',
+        'btn_dev_sys': '📊 Donanım, Sürücü & Çekirdek Matrisi (sysinfo)',
+        'btn_dev_purge': '🧹 Geçici Bellek ve Log Temizliği (purge)',
+        'btn_dev_winexe': '💎 Geliştirici İmzası & Mimarisi (winexe)',
+        'doc_start': '\n=======================================================\n🔬 SafeBox Profesyonel 20 Kademeli Derin Teşhis Paketi\n=======================================================\n',
+        'doc_pass': '[ ✓ GEÇTİ ]',
+        'doc_fail': '[ ✗ HATA ]',
+        'doc_sol': '↳ Çözüm:',
+        'doc_score': '🎯 Teşhis Skoru: %{score} ({passed}/{total} Test Başarılı)',
+        'doc_status_ok': '🛡️ Güvenlik ve İzolasyon Durumu: MÜKEMMEL (Kullanıma Hazır)',
+        'doc_status_warn': '🛡️ Güvenlik ve İzolasyon Durumu: UYARI (Eksik paketler var)',
+        'sys_header': '\n=== 📊 Sistem Donanım & Çekirdek Matrisi ===\n',
+        'sys_os': 'OS Dağıtımı  :',
+        'sys_kernel': 'Kernel Sürümü:',
+        'sys_cpu': 'İşlemci      :',
+        'sys_ram': 'Toplam RAM   :',
+        'sys_gpu': 'Ekran Kartı  :',
+        'sys_disp': 'Display Sunu :',
+        'sys_de': 'Masaüstü     :',
+        'purge_msg': '\n[OK] Geçici bellek tamponları, loglar ve geçici dizinler sıfırlandı.\n',
+        'dlg_save_title': 'Konsol Günlüğünü Kaydet',
+        'err_export': 'Dışa aktarma hatası:',
+        'err_clear': 'Günlük temizlenemedi:',
+        'err_core_missing': 'safebox-core ikili dosyası bulunamadı!'
     },
     'en': {
         'title': 'SafeBox Secure Sandbox',
@@ -110,7 +135,32 @@ LANGUAGES = {
         'log_ready': '[INFO] Console ready. Type "developer" for dev options.',
         'log_reset': 'Console log reset.',
         'pkg_check_title': '[SYSTEM PACKAGE CHECK]:',
-        'lang_btn': '🌐 TR'
+        'lang_btn': '🌐 TR',
+        'dev_active_msg': '\n🎉 [DEVELOPER MODE ACTIVE]: 5th Tab unlocked! You can now use the 20-Stage Diagnostic Suite.\n',
+        'btn_dev_doc': '🩺 SafeBox Deep Doctor (20-Stage Deep Diagnostics)',
+        'btn_dev_sys': '📊 Hardware, Driver & Kernel Matrix (sysinfo)',
+        'btn_dev_purge': '🧹 Purge Temp Buffers & Logs (purge)',
+        'btn_dev_winexe': '💎 Developer Signature & Architecture (winexe)',
+        'doc_start': '\n=======================================================\n🔬 SafeBox Professional 20-Stage Deep Diagnostic Suite\n=======================================================\n',
+        'doc_pass': '[ ✓ PASSED ]',
+        'doc_fail': '[ ✗ FAILED ]',
+        'doc_sol': '↳ Fix:',
+        'doc_score': '🎯 Diagnostic Score: %{score} ({passed}/{total} Tests Passed)',
+        'doc_status_ok': '🛡️ Security & Isolation Status: EXCELLENT (Ready for use)',
+        'doc_status_warn': '🛡️ Security & Isolation Status: WARNING (Missing components detected)',
+        'sys_header': '\n=== 📊 System Hardware & Kernel Matrix ===\n',
+        'sys_os': 'OS Distro    :',
+        'sys_kernel': 'Kernel Ver   :',
+        'sys_cpu': 'CPU Cores    :',
+        'sys_ram': 'Total RAM    :',
+        'sys_gpu': 'Graphics Card:',
+        'sys_disp': 'Display Srv  :',
+        'sys_de': 'Desktop Env  :',
+        'purge_msg': '\n[OK] Temporary memory buffers, logs and cache reset successfully.\n',
+        'dlg_save_title': 'Save Console Log',
+        'err_export': 'Export failed:',
+        'err_clear': 'Could not clear log:',
+        'err_core_missing': 'safebox-core binary not found!'
     }
 }
 
@@ -123,7 +173,7 @@ def _(key, **kwargs):
 class SafeBoxApp(Gtk.Window):
     def __init__(self):
         super().__init__(title=f"SafeBox Kontrol Merkezi (v{VERSION})")
-        self.set_default_size(800, 640)
+        self.set_default_size(820, 640)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.set_border_width(14)
 
@@ -336,21 +386,21 @@ class SafeBoxApp(Gtk.Window):
         dev_grid.set_column_spacing(10)
         dev_grid.set_row_spacing(10)
 
-        btn_doc = Gtk.Button(label="🩺 SafeBox Deep Doctor (20 Kademeli Derin Teşhis)")
-        btn_doc.connect("clicked", lambda w: threading.Thread(target=self.run_deep_doctor, daemon=True).start())
-        dev_grid.attach(btn_doc, 0, 0, 1, 1)
+        self.btn_doc = Gtk.Button(label=_('btn_dev_doc'))
+        self.btn_doc.connect("clicked", lambda w: threading.Thread(target=self.run_deep_doctor, daemon=True).start())
+        dev_grid.attach(self.btn_doc, 0, 0, 1, 1)
 
-        btn_sys = Gtk.Button(label="📊 Donanım, Sürücü & Çekirdek Matrisi (sysinfo)")
-        btn_sys.connect("clicked", lambda w: self.run_sysinfo())
-        dev_grid.attach(btn_sys, 1, 0, 1, 1)
+        self.btn_sys = Gtk.Button(label=_('btn_dev_sys'))
+        self.btn_sys.connect("clicked", lambda w: self.run_sysinfo())
+        dev_grid.attach(self.btn_sys, 1, 0, 1, 1)
 
-        btn_purge = Gtk.Button(label="🧹 Geçici Bellek ve Log Temizliği (purge)")
-        btn_purge.connect("clicked", lambda w: self.run_purge())
-        dev_grid.attach(btn_purge, 0, 1, 1, 1)
+        self.btn_purge = Gtk.Button(label=_('btn_dev_purge'))
+        self.btn_purge.connect("clicked", lambda w: self.run_purge())
+        dev_grid.attach(self.btn_purge, 0, 1, 1, 1)
 
-        btn_winexe = Gtk.Button(label="💎 Geliştirici İmzası & Mimarisi (winexe)")
-        btn_winexe.connect("clicked", lambda w: self.run_winexe_sign())
-        dev_grid.attach(btn_winexe, 1, 1, 1, 1)
+        self.btn_winexe = Gtk.Button(label=_('btn_dev_winexe'))
+        self.btn_winexe.connect("clicked", lambda w: self.run_winexe_sign())
+        dev_grid.attach(self.btn_winexe, 1, 1, 1, 1)
 
         self.tab_dev.pack_start(dev_grid, False, False, 0)
         self.tab_dev_label = Gtk.Label(label=_('tab_dev'))
@@ -381,43 +431,58 @@ class SafeBoxApp(Gtk.Window):
             self.notebook.append_page(self.tab_dev, self.tab_dev_label)
             self.show_all()
             self.notebook.set_current_page(4)
-            self.log_buffer.insert_at_cursor("\n🎉 [GELİŞTİRİCİ MODU AKTİF]: 5. Sekme açıldı! 20 Kademeli Teşhis modülünü kullanabilirsiniz.\n")
+            self.log_buffer.insert_at_cursor(_('dev_active_msg'))
 
     def run_deep_doctor(self):
         GLib.idle_add(lambda: self.notebook.set_current_page(3))
-        GLib.idle_add(lambda: self.log_buffer.insert_at_cursor("\n=======================================================\n🔬 SafeBox Professional 20-Stage Deep Diagnostic Suite\n=======================================================\n"))
+        GLib.idle_add(lambda: self.log_buffer.insert_at_cursor(_('doc_start')))
 
-        tests = [
-            # 1. Çekirdek & İzolasyon Mimarisi
-            ("1. Çekirdek Bubblewrap İkili Dosyası", "which bwrap", "Kritik: bubblewrap paketi eksik."),
-            ("2. Kullanıcı Ad Alanı (User Namespaces)", "bwrap --ro-bind / / true", "Kernel unprivileged user namespace kısıtlı."),
-            ("3. PID & IPC Sanallaştırma İzolasyonu", "bwrap --unshare-all --ro-bind / / true", "IPC/PID çekirdek izolasyonu engellendi."),
-            ("4. Ağ Ad Alanı (Network Namespace) İzolasyonu", "bwrap --unshare-net --ro-bind / / true", "Kernel net namespace oluşturulamıyor."),
-            ("5. Kök Dosya Sistemi Salt-Okunur (Read-Only) Kilidi", "bwrap --ro-bind / / touch /safebox_ro_test 2>/dev/null; [ ! -f /safebox_ro_test ]", "Salt okunur kilit testi başarısız."),
-            ("6. Geçici RAM (tmpfs) Alanı Oluşturma", "bwrap --ro-bind / / --tmpfs /tmp touch /tmp/test_ram", "RAM disk (tmpfs) tahsis edilemedi."),
-            
-            # 2. Grafik & Ekran Sunucusu
-            ("7. Xephyr Sanal X11 Sunucusu", "which Xephyr", "xserver-xephyr paketi eksik."),
-            ("8. Ana Sistem X11/Wayland Display Soketi", "[ -n \"$DISPLAY\" ] || [ -n \"$WAYLAND_DISPLAY\" ]", "Aktif masaüstü display soketi yok."),
-            ("9. DRI Direct Rendering Düğümleri (/dev/dri)", "[ -d /dev/dri ] && [ -r /dev/dri ]", "DRI grafik hızlandırma aygıtı okunamıyor."),
-            ("10. NVIDIA Donanım Aygıtları (/dev/nvidia*)", "[ -e /dev/nvidia0 ] || [ -d /dev/dri ]", "Özel GPU düğümü algılanamadı (Intel/AMD/NVIDIA)."),
-            ("11. OpenGL / Mesa 3D Donanım Doğrulaması", "glxinfo >/dev/null 2>&1 || true", "Mesa/OpenGL kütüphaneleri mevcut."),
-
-            # 3. Masaüstü & İletişim Oturumu
-            ("12. MATE Oturum Yöneticisi (mate-session)", "which mate-session", "mate-session-manager paketi eksik."),
-            ("13. DBus Oturum Yöneticisi (dbus-launch)", "which dbus-launch", "dbus-x11 paketi eksik."),
-            ("14. Masaüstü Teması & İkon Veritabanı", "[ -d /usr/share/icons/Yaru ] || [ -d /usr/share/icons/hicolor ]", "Standart tema ikon dizinleri bulunamadı."),
-            ("15. Pano Senkronizasyon Altyapısı", "which xsel || which xclip || which wl-clipboard || true", "Pano senkronizasyon aracı eksik."),
-
-            # 4. Ses & Ağ İletişimi
-            ("16. PulseAudio / PipeWire Canlı Ses Soketi", "[ -S \"${XDG_RUNTIME_DIR}/pulse/native\" ] || [ -S \"${XDG_RUNTIME_DIR}/pipewire-0\" ]", "Ses sunucusu soketi bulunamadı."),
-            ("17. DNS ve Dış Ağ Çözümleme Yeteneği", "ping -c 1 -W 2 1.1.1.1 || ping -c 1 -W 2 8.8.8.8", "Dış ağ bağlantısı kurulamadı."),
-            ("18. Yerel Ağ Adres Çözümleme (DNS)", "host -W 2 google.com || nslookup google.com || true", "DNS sorgusu yanıt vermedi."),
-
-            # 5. Dosya Sistemi & Yetkiler
-            ("19. Paylaşım Köprüsü (~/SafeBox-Paylasim)", "mkdir -p ~/SafeBox-Paylasim && [ -w ~/SafeBox-Paylasim ]", "Ortak klasör yazılabilir değil."),
-            ("20. Log ve Teşhis Alanı (~/.local/share/safebox)", "mkdir -p ~/.local/share/safebox && [ -w ~/.local/share/safebox ]", "Log depolama dizini yazılamaz durumda.")
-        ]
+        if CURRENT_LANG == 'tr':
+            tests = [
+                ("1. Çekirdek Bubblewrap İkili Dosyası", "which bwrap", "Kritik: bubblewrap paketi eksik."),
+                ("2. Kullanıcı Ad Alanı (User Namespaces)", "bwrap --ro-bind / / true", "Kernel unprivileged user namespace kısıtlı."),
+                ("3. PID & IPC Sanallaştırma İzolasyonu", "bwrap --unshare-all --ro-bind / / true", "IPC/PID çekirdek izolasyonu engellendi."),
+                ("4. Ağ Ad Alanı (Network Namespace) İzolasyonu", "bwrap --unshare-net --ro-bind / / true", "Kernel net namespace oluşturulamıyor."),
+                ("5. Kök Dosya Sistemi Salt-Okunur (Read-Only) Kilidi", "bwrap --ro-bind / / touch /safebox_ro_test 2>/dev/null; [ ! -f /safebox_ro_test ]", "Salt okunur kilit testi başarısız."),
+                ("6. Geçici RAM (tmpfs) Alanı Oluşturma", "bwrap --ro-bind / / --tmpfs /tmp touch /tmp/test_ram", "RAM disk (tmpfs) tahsis edilemedi."),
+                ("7. Xephyr Sanal X11 Sunucusu", "which Xephyr", "xserver-xephyr paketi eksik."),
+                ("8. Ana Sistem X11/Wayland Display Soketi", "[ -n \"$DISPLAY\" ] || [ -n \"$WAYLAND_DISPLAY\" ]", "Aktif masaüstü display soketi yok."),
+                ("9. DRI Direct Rendering Düğümleri (/dev/dri)", "[ -d /dev/dri ] && [ -r /dev/dri ]", "DRI grafik hızlandırma aygıtı okunamıyor."),
+                ("10. NVIDIA Donanım Aygıtları (/dev/nvidia*)", "[ -e /dev/nvidia0 ] || [ -d /dev/dri ]", "Özel GPU düğümü algılanamadı (Intel/AMD/NVIDIA)."),
+                ("11. OpenGL / Mesa 3D Donanım Doğrulaması", "glxinfo >/dev/null 2>&1 || true", "Mesa/OpenGL kütüphaneleri mevcut."),
+                ("12. MATE Oturum Yöneticisi (mate-session)", "which mate-session", "mate-session-manager paketi eksik."),
+                ("13. DBus Oturum Yöneticisi (dbus-launch)", "which dbus-launch", "dbus-x11 paketi eksik."),
+                ("14. Masaüstü Teması & İkon Veritabanı", "[ -d /usr/share/icons/Yaru ] || [ -d /usr/share/icons/hicolor ]", "Standart tema ikon dizinleri bulunamadı."),
+                ("15. Pano Senkronizasyon Altyapısı", "which xsel || which xclip || which wl-clipboard || true", "Pano senkronizasyon aracı eksik."),
+                ("16. PulseAudio / PipeWire Canlı Ses Soketi", "[ -S \"${XDG_RUNTIME_DIR}/pulse/native\" ] || [ -S \"${XDG_RUNTIME_DIR}/pipewire-0\" ]", "Ses sunucusu soketi bulunamadı."),
+                ("17. DNS ve Dış Ağ Çözümleme Yeteneği", "ping -c 1 -W 2 1.1.1.1 || ping -c 1 -W 2 8.8.8.8", "Dış ağ bağlantısı kurulamadı."),
+                ("18. Yerel Ağ Adres Çözümleme (DNS)", "host -W 2 google.com || nslookup google.com || true", "DNS sorgusu yanıt vermedi."),
+                ("19. Paylaşım Köprüsü (~/SafeBox-Paylasim)", "mkdir -p ~/SafeBox-Paylasim && [ -w ~/SafeBox-Paylasim ]", "Ortak klasör yazılabilir değil."),
+                ("20. Log ve Teşhis Alanı (~/.local/share/safebox)", "mkdir -p ~/.local/share/safebox && [ -w ~/.local/share/safebox ]", "Log depolama dizini yazılamaz durumda.")
+            ]
+        else:
+            tests = [
+                ("1. Kernel Bubblewrap Executable", "which bwrap", "Critical: bubblewrap package missing."),
+                ("2. User Namespaces Support", "bwrap --ro-bind / / true", "Kernel unprivileged user namespace restricted."),
+                ("3. PID & IPC Virtualization Isolation", "bwrap --unshare-all --ro-bind / / true", "IPC/PID kernel isolation blocked."),
+                ("4. Network Namespace Isolation", "bwrap --unshare-net --ro-bind / / true", "Kernel net namespace creation failed."),
+                ("5. Root Filesystem Read-Only Lock", "bwrap --ro-bind / / touch /safebox_ro_test 2>/dev/null; [ ! -f /safebox_ro_test ]", "Read-only enforcement test failed."),
+                ("6. Volatile RAM (tmpfs) Allocation", "bwrap --ro-bind / / --tmpfs /tmp touch /tmp/test_ram", "RAM disk (tmpfs) could not be allocated."),
+                ("7. Xephyr Virtual X11 Server", "which Xephyr", "xserver-xephyr package missing."),
+                ("8. Host System X11/Wayland Display Socket", "[ -n \"$DISPLAY\" ] || [ -n \"$WAYLAND_DISPLAY\" ]", "No active desktop display socket."),
+                ("9. DRI Direct Rendering Nodes (/dev/dri)", "[ -d /dev/dri ] && [ -r /dev/dri ]", "DRI hardware acceleration node unreadable."),
+                ("10. NVIDIA Hardware Devices (/dev/nvidia*)", "[ -e /dev/nvidia0 ] || [ -d /dev/dri ]", "No GPU node detected (Intel/AMD/NVIDIA)."),
+                ("11. OpenGL / Mesa 3D Hardware Verification", "glxinfo >/dev/null 2>&1 || true", "Mesa/OpenGL libraries verified."),
+                ("12. MATE Session Manager (mate-session)", "which mate-session", "mate-session-manager package missing."),
+                ("13. DBus Session Manager (dbus-launch)", "which dbus-launch", "dbus-x11 package missing."),
+                ("14. Desktop Theme & Icon Database", "[ -d /usr/share/icons/Yaru ] || [ -d /usr/share/icons/hicolor ]", "Standard theme icon dirs missing."),
+                ("15. Clipboard Synchronization Tools", "which xsel || which xclip || which wl-clipboard || true", "Clipboard sync tool missing."),
+                ("16. PulseAudio / PipeWire Live Audio Socket", "[ -S \"${XDG_RUNTIME_DIR}/pulse/native\" ] || [ -S \"${XDG_RUNTIME_DIR}/pipewire-0\" ]", "Audio server socket not found."),
+                ("17. DNS & Outbound Network Reachability", "ping -c 1 -W 2 1.1.1.1 || ping -c 1 -W 2 8.8.8.8", "Outbound network connection unreachable."),
+                ("18. Local DNS Address Resolution", "host -W 2 google.com || nslookup google.com || true", "DNS query did not respond."),
+                ("19. Shared Bridge Folder (~/SafeBox-Paylasim)", "mkdir -p ~/SafeBox-Paylasim && [ -w ~/SafeBox-Paylasim ]", "Shared folder is not writable."),
+                ("20. Log & Diagnostic Workspace (~/.local/share/safebox)", "mkdir -p ~/.local/share/safebox && [ -w ~/.local/share/safebox ]", "Log storage dir not writable.")
+            ]
 
         passed = 0
         total = len(tests)
@@ -426,16 +491,17 @@ class SafeBoxApp(Gtk.Window):
             ret = subprocess.run(cmd, shell=True, capture_output=True)
             if ret.returncode == 0:
                 passed += 1
-                msg = f"[ ✓ GEÇTİ ] {title}\n"
+                msg = f"{_('doc_pass')} {title}\n"
             else:
-                msg = f"[ ✗ HATA ] {title}\n        ↳ Çözüm: {fix}\n"
+                msg = f"{_('doc_fail')} {title}\n        {_('doc_sol')} {fix}\n"
             GLib.idle_add(lambda m=msg: self.log_buffer.insert_at_cursor(m))
-            time.sleep(0.04)
+            time.sleep(0.03)
 
         score_percent = int((passed / total) * 100)
+        status_text = _('doc_status_ok') if score_percent >= 90 else _('doc_status_warn')
         summary = f"\n=======================================================\n" \
-                  f"🎯 Teşhis Skoru: %{score_percent} ({passed}/{total} Test Başarılı)\n" \
-                  f"🛡️ Güvenlik ve İzolasyon Durumu: {'MÜKEMMEL (Kullanıma Hazır)' if score_percent >= 90 else 'UYARI (Eksik paketler var)'}\n" \
+                  f"{_('doc_score', score=score_percent, passed=passed, total=total)}\n" \
+                  f"{status_text}\n" \
                   f"=======================================================\n"
         GLib.idle_add(lambda: self.log_buffer.insert_at_cursor(summary))
 
@@ -445,7 +511,7 @@ class SafeBoxApp(Gtk.Window):
         cpus = multiprocessing.cpu_count()
         uname = os.uname()
         
-        gpu_info = "Standart Entegre / Ayrık GPU"
+        gpu_info = "Integrated / Discrete GPU"
         try:
             lspci = subprocess.run("lspci | grep -E 'VGA|3D'", shell=True, capture_output=True, text=True).stdout
             if lspci:
@@ -453,14 +519,14 @@ class SafeBoxApp(Gtk.Window):
         except:
             pass
 
-        info = f"\n=== 📊 Sistem Donanım & Çekirdek Matrisi ===\n" \
-               f"OS Dağıtımı  : {uname.sysname} ({uname.machine})\n" \
-               f"Kernel Sürümü: {uname.release}\n" \
-               f"İşlemci      : {cpus} Mantıksal Çekirdek (Threads)\n" \
-               f"Toplam RAM   : {mem} GB RAM\n" \
-               f"Ekran Kartı  : {gpu_info}\n" \
-               f"Display Sunu : {os.environ.get('XDG_SESSION_TYPE', 'x11/wayland')}\n" \
-               f"Masaüstü     : {os.environ.get('XDG_CURRENT_DESKTOP', 'Ubuntu/GNOME')}\n" \
+        info = f"{_('sys_header')}" \
+               f"{_('sys_os')} {uname.sysname} ({uname.machine})\n" \
+               f"{_('sys_kernel')} {uname.release}\n" \
+               f"{_('sys_cpu')} {cpus} Threads\n" \
+               f"{_('sys_ram')} {mem} GB RAM\n" \
+               f"{_('sys_gpu')} {gpu_info}\n" \
+               f"{_('sys_disp')} {os.environ.get('XDG_SESSION_TYPE', 'x11/wayland')}\n" \
+               f"{_('sys_de')} {os.environ.get('XDG_CURRENT_DESKTOP', 'Ubuntu/GNOME')}\n" \
                f"===========================================\n"
         self.log_buffer.insert_at_cursor(info)
 
@@ -469,7 +535,7 @@ class SafeBoxApp(Gtk.Window):
         if os.path.exists(LOG_FILE):
             open(LOG_FILE, 'w').close()
         self.log_buffer.set_text(_('log_header', ver=VERSION) + "\n" + _('log_reset') + "\n")
-        self.log_buffer.insert_at_cursor("\n[OK] Geçici bellek tamponları, loglar ve geçici dizinler sıfırlandı.\n")
+        self.log_buffer.insert_at_cursor(_('purge_msg'))
 
     def run_winexe_sign(self):
         self.notebook.set_current_page(3)
@@ -518,7 +584,7 @@ class SafeBoxApp(Gtk.Window):
             out = res.stdout + res.stderr
             self.log_buffer.insert_at_cursor(out if out else "[OK]\n")
         except Exception as e:
-            self.log_buffer.insert_at_cursor(f"[HATA] {str(e)}\n")
+            self.log_buffer.insert_at_cursor(f"[HATA / ERROR] {str(e)}\n")
         self.cmd_entry.set_text("")
 
     def populate_res_combo(self, active_idx=1):
@@ -568,6 +634,13 @@ class SafeBoxApp(Gtk.Window):
         self.btn_clear_log.set_label(_('btn_clear'))
         self.btn_quit.set_label(_('btn_close'))
         self.p_lbl.set_text(_('btn_start'))
+
+        # Geliştirici Sekmesi Butonlarının Dil Güncellemesi
+        self.btn_doc.set_label(_('btn_dev_doc'))
+        self.btn_sys.set_label(_('btn_dev_sys'))
+        self.btn_purge.set_label(_('btn_dev_purge'))
+        self.btn_winexe.set_label(_('btn_dev_winexe'))
+
         self.load_log()
 
     def load_log(self, widget=None):
@@ -578,7 +651,7 @@ class SafeBoxApp(Gtk.Window):
                     content = f.read()
                 self.log_buffer.set_text(header_text + content)
             except Exception as e:
-                self.log_buffer.set_text(header_text + f"[HATA] Log okunamadı: {str(e)}\n")
+                self.log_buffer.set_text(header_text + f"[HATA / ERROR] Log: {str(e)}\n")
         else:
             self.log_buffer.set_text(header_text + _('log_ready') + "\n")
 
@@ -589,11 +662,11 @@ class SafeBoxApp(Gtk.Window):
             output = re.sub(r'Maintainer:.*', 'Maintainer: Winexe', output)
             self.log_buffer.insert_at_cursor(f"\n\n{_('pkg_check_title')}\n{output}\n")
         except Exception as e:
-            self.log_buffer.insert_at_cursor(f"\n[HATA] Paket sorgulanamadı: {str(e)}\n")
+            self.log_buffer.insert_at_cursor(f"\n[HATA / ERROR] {str(e)}\n")
 
     def export_log(self, widget=None):
         dialog = Gtk.FileChooserDialog(
-            title="Konsol Günlüğünü Kaydet",
+            title=_('dlg_save_title'),
             parent=self,
             action=Gtk.FileChooserAction.SAVE
         )
@@ -601,7 +674,7 @@ class SafeBoxApp(Gtk.Window):
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
             Gtk.STOCK_SAVE, Gtk.ResponseType.OK
         )
-        dialog.set_current_name(f"safebox_v{VERSION}_gunluk.txt")
+        dialog.set_current_name(f"safebox_v{VERSION}_log.txt")
         dialog.set_do_overwrite_confirmation(True)
 
         if dialog.run() == Gtk.ResponseType.OK:
@@ -613,7 +686,7 @@ class SafeBoxApp(Gtk.Window):
                 with open(target_path, "w", encoding="utf-8") as f:
                     f.write(text)
             except Exception as e:
-                self._show_error("Hata", f"Dışa aktarma hatası: {str(e)}")
+                self._show_error("Hata / Error", f"{_('err_export')} {str(e)}")
         dialog.destroy()
 
     def clear_log(self, widget=None):
@@ -622,7 +695,7 @@ class SafeBoxApp(Gtk.Window):
                 f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {_('log_reset')}\n")
             self.load_log()
         except Exception as e:
-            self._show_error("Hata", f"Günlük temizlenemedi: {str(e)}")
+            self._show_error("Hata / Error", f"{_('err_clear')} {str(e)}")
 
     def _show_error(self, title, message):
         dialog = Gtk.MessageDialog(
@@ -656,14 +729,14 @@ class SafeBoxApp(Gtk.Window):
             if res.returncode != 0:
                 raise subprocess.CalledProcessError(res.returncode, cmd, output=res.stdout, stderr=res.stderr)
         except subprocess.CalledProcessError as e:
-            err_msg = f"SafeBox sonlandı (Çıkış: {e.returncode})"
+            err_msg = f"SafeBox Exit: {e.returncode}"
             if e.stderr:
-                err_msg += f"\n\nDetay:\n{e.stderr[:300]}"
-            GLib.idle_add(self._show_error, "Sanal Alan Bildirimi", err_msg)
+                err_msg += f"\n\nDetails:\n{e.stderr[:300]}"
+            GLib.idle_add(self._show_error, "SafeBox Sandbox", err_msg)
         except FileNotFoundError:
-            GLib.idle_add(self._show_error, "Hata", "safebox-core ikili dosyası bulunamadı!")
+            GLib.idle_add(self._show_error, "Error", _('err_core_missing'))
         except Exception as e:
-            GLib.idle_add(self._show_error, "Hata", str(e))
+            GLib.idle_add(self._show_error, "Error", str(e))
         finally:
             GLib.idle_add(Gtk.main_quit)
 

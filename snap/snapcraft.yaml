@@ -1,5 +1,5 @@
 name: safebox
-version: '1.4.1'
+version: '1.4.2'
 summary: Ultra-secure, RAM-backed lightweight sandbox environment
 description: |
   SafeBox creates a volatile, fully isolated desktop sandbox with Bubblewrap.
