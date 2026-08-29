@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Robust Engine & Virtual Machine Runtime Core (v1.4.7)
+# SafeBox Robust Engine - XFCE4 Runtime Core (v1.5.0)
 set -e
 
 RAM_GB="${1:-4}"
@@ -14,9 +14,10 @@ LOG_DIR="${HOME}/.local/share/safebox"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
 mkdir -p "$LOG_DIR"
 
-echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Sanal Makine Başlatılıyor ===" > "$ENGINE_LOG"
+echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Sanal Makine Başlatılıyor (XFCE4) ===" > "$ENGINE_LOG"
+echo "Yapılandırma: RAM=${RAM_GB}GB, CPU=${CPU_CORES}, Çözünürlük=${RESOLUTION}, Ağ=${NET}, Ses=${AUDIO}" >> "$ENGINE_LOG"
 
-# 1. Boş bir DISPLAY ekran numarası bul
+# 1. Boş bir DISPLAY ekran numarası bul (:10 ile :99 arası)
 TARGET_DISP=""
 for d in $(seq 10 99); do
     if [ ! -e "/tmp/.X11-unix/X$d" ] && [ ! -e "/tmp/.X$d-lock" ]; then
@@ -31,23 +32,24 @@ if [ -z "$TARGET_DISP" ]; then
 fi
 echo "[BİLGİ] Sanal X11 Display atandı: $TARGET_DISP" >> "$ENGINE_LOG"
 
-# 2. Xephyr Başlat
+# 2. Xephyr Sanal Ekranını Başlat
 Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Virtual Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
 cleanup() {
     echo "[BİLGİ] Oturum kapatılıyor, süreçler temizleniyor..." >> "$ENGINE_LOG"
     kill -9 "$XEPHYR_PID" 2>/dev/null || true
-    echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Sanal Makine Güvenle Kapatıldı ===" >> "$ENGINE_LOG"
+    echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Sanal Makine Kapatıldı ===" >> "$ENGINE_LOG"
 }
 trap cleanup EXIT INT TERM
 
+# Xephyr soketinin hazır olmasını bekle
 for i in {1..25}; do
     if [ -e "/tmp/.X11-unix/X${TARGET_DISP#:}" ]; then break; fi
     sleep 0.2
 done
 
-# 3. İzole Bubblewrap Parametreleri
+# 3. Bubblewrap İzolasyon Parametreleri
 BWRAP_ARGS=(
     --ro-bind /usr /usr
     --ro-bind /lib /lib
@@ -69,7 +71,6 @@ BWRAP_ARGS=(
     --setenv USER safebox
     --setenv LOGNAME safebox
     --setenv DISPLAY "$TARGET_DISP"
-    --setenv XDG_DATA_DIRS "/home/safebox/.local/share:/usr/share"
     --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
     --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
     --unshare-all
@@ -88,17 +89,13 @@ if [ "$NET" = "1" ]; then
     fi
 fi
 
-# GPU / DRI
-if [ -d /dev/dri ]; then
-    BWRAP_ARGS+=(--dev-bind /dev/dri /dev/dri)
-fi
+# GPU / DRI Aygıtları
+if [ -d /dev/dri ]; then BWRAP_ARGS+=(--dev-bind /dev/dri /dev/dri); fi
 for nv in /dev/nvidia*; do
-    if [ -e "$nv" ]; then
-        BWRAP_ARGS+=(--dev-bind "$nv" "$nv")
-    fi
+    if [ -e "$nv" ]; then BWRAP_ARGS+=(--dev-bind "$nv" "$nv"); fi
 done
 
-# Ses Soketi
+# Ses Soketi (PulseAudio / PipeWire)
 if [ "$AUDIO" = "1" ]; then
     if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
         BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/pulse/native" "/run/user/1000/pulse/native" --setenv PULSE_SERVER "unix:/run/user/1000/pulse/native")
@@ -113,10 +110,8 @@ if [ "$SHARE_FOLDER" = "1" ]; then
     BWRAP_ARGS+=(--bind "${HOME}/SafeBox-Paylasim" "/home/safebox/Paylasim")
 fi
 
-# X11 Socket
+# X11 Socket Bağlantısı
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
 
-echo "[BİLGİ] Sanal masaüstü izole oturumla başlatılıyor..." >> "$ENGINE_LOG"
-
-# 4. İzole Oturum Başlatıcıyı Çağır
+# 4. XFCE4 Başlatıcıyı Çağır
 bwrap "${BWRAP_ARGS[@]}" dbus-launch --exit-with-session /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || true

@@ -11,7 +11,7 @@ import shutil
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.4.7"
+VERSION = "1.5.0"
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -22,7 +22,7 @@ CURRENT_LANG = 'tr'
 LANGUAGES = {
     'tr': {
         'title': 'SafeBox Güvenli Alan',
-        'subtitle': 'MATE Sanal Masaüstü, Donanım İzolasyonu ve Teşhis Konsolu',
+        'subtitle': 'XFCE4 Sanal Masaüstü, Donanım İzolasyonu ve Teşhis Konsolu',
         'tab1': 'Genel Bakış',
         'tab2': 'Kaynak ve Ekran',
         'tab3': 'İzinler ve Paylaşım',
@@ -31,7 +31,7 @@ LANGUAGES = {
         'frame_iso': ' İzolasyon Güvenlik Modeli ',
         'item1_t': 'Kişisel Gizlilik:',
         'item1_d': "Ana ev dizini gizlenir, izole 'safebox' profili atanır.",
-        'item2_t': 'Modern MATE Arayüzü:',
+        'item2_t': 'Modern XFCE4 Arayüzü:',
         'item2_d': 'Yaru temalı hafif masaüstü ve 5 temel araç.',
         'item3_t': 'Geçici RAM Alanı:',
         'item3_d': "Oturum sonlandığında indirilen her şey RAM'den silinir.",
@@ -93,7 +93,7 @@ LANGUAGES = {
     },
     'en': {
         'title': 'SafeBox Secure Sandbox',
-        'subtitle': 'MATE Virtual Desktop, Hardware Isolation & Diagnostic Console',
+        'subtitle': 'XFCE4 Virtual Desktop, Hardware Isolation & Diagnostic Console',
         'tab1': 'Overview',
         'tab2': 'Resource & Display',
         'tab3': 'Permissions & Sharing',
@@ -102,7 +102,7 @@ LANGUAGES = {
         'frame_iso': ' Isolation Security Model ',
         'item1_t': 'Personal Privacy:',
         'item1_d': "Home directory hidden, isolated 'safebox' profile assigned.",
-        'item2_t': 'Modern MATE Desktop:',
+        'item2_t': 'Modern XFCE4 Desktop:',
         'item2_d': 'Yaru-themed lightweight desktop and 5 essential tools.',
         'item3_t': 'Volatile RAM Storage:',
         'item3_d': 'Everything downloaded is wiped from RAM upon exit.',
@@ -450,7 +450,7 @@ class SafeBoxApp(Gtk.Window):
                 ("9. DRI Direct Rendering Düğümleri (/dev/dri)", "[ -d /dev/dri ] && [ -r /dev/dri ]", "DRI grafik hızlandırma aygıtı okunamıyor."),
                 ("10. NVIDIA Donanım Aygıtları (/dev/nvidia*)", "[ -e /dev/nvidia0 ] || [ -d /dev/dri ]", "Özel GPU düğümü algılanamadı (Intel/AMD/NVIDIA)."),
                 ("11. OpenGL / Mesa 3D Donanım Doğrulaması", "glxinfo >/dev/null 2>&1 || true", "Mesa/OpenGL kütüphaneleri mevcut."),
-                ("12. MATE Oturum Yöneticisi (mate-session)", "which mate-session", "mate-session-manager paketi eksik."),
+                ("12. XFCE4 Oturum Yöneticisi (mate-session)", "which mate-session", "mate-session-manager paketi eksik."),
                 ("13. DBus Oturum Yöneticisi (dbus-launch)", "which dbus-launch", "dbus-x11 paketi eksik."),
                 ("14. Masaüstü Teması & İkon Veritabanı", "[ -d /usr/share/icons/Yaru ] || [ -d /usr/share/icons/hicolor ]", "Standart tema ikon dizinleri bulunamadı."),
                 ("15. Pano Senkronizasyon Altyapısı", "which xsel || which xclip || which wl-clipboard || true", "Pano senkronizasyon aracı eksik."),
@@ -473,7 +473,7 @@ class SafeBoxApp(Gtk.Window):
                 ("9. DRI Direct Rendering Nodes (/dev/dri)", "[ -d /dev/dri ] && [ -r /dev/dri ]", "DRI hardware acceleration node unreadable."),
                 ("10. NVIDIA Hardware Devices (/dev/nvidia*)", "[ -e /dev/nvidia0 ] || [ -d /dev/dri ]", "No GPU node detected (Intel/AMD/NVIDIA)."),
                 ("11. OpenGL / Mesa 3D Hardware Verification", "glxinfo >/dev/null 2>&1 || true", "Mesa/OpenGL libraries verified."),
-                ("12. MATE Session Manager (mate-session)", "which mate-session", "mate-session-manager package missing."),
+                ("12. XFCE4 Session Manager (mate-session)", "which mate-session", "mate-session-manager package missing."),
                 ("13. DBus Session Manager (dbus-launch)", "which dbus-launch", "dbus-x11 package missing."),
                 ("14. Desktop Theme & Icon Database", "[ -d /usr/share/icons/Yaru ] || [ -d /usr/share/icons/hicolor ]", "Standard theme icon dirs missing."),
                 ("15. Clipboard Synchronization Tools", "which xsel || which xclip || which wl-clipboard || true", "Clipboard sync tool missing."),
