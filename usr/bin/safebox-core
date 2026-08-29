@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Robust Engine & Virtual Machine Runtime Core (v1.4.3)
+# SafeBox Robust Engine & Virtual Machine Runtime Core (v1.4.4)
 set -e
 
 RAM_GB="${1:-4}"
@@ -45,14 +45,14 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Xephyr hazır olana kadar bekle
-for i in {1..20}; do
+for i in {1..25}; do
     if [ -e "/tmp/.X11-unix/X${TARGET_DISP#:}" ]; then
         break
     fi
     sleep 0.2
 done
 
-# 3. Bubblewrap Parametrelerini İnşa Et
+# 3. Bubblewrap Parametrelerini İnşa Et (Kusursuz /home tmpfs Mimarisi)
 BWRAP_ARGS=(
     --ro-bind / /
     --dev /dev
@@ -62,7 +62,8 @@ BWRAP_ARGS=(
     --tmpfs /run
     --dir /run/user/1000
     --setenv XDG_RUNTIME_DIR /run/user/1000
-    --tmpfs /home/safebox
+    --tmpfs /home
+    --dir /home/safebox
     --setenv HOME /home/safebox
     --setenv USER safebox
     --setenv LOGNAME safebox
@@ -70,7 +71,6 @@ BWRAP_ARGS=(
     --unshare-all
     --die-with-parent
     --new-session
-    # safebox komutunu sanal alan içinde maskele (iç içe açılmasını engeller)
     --ro-bind /usr/share/safebox/safebox-guest-blocker /usr/bin/safebox
     --ro-bind /usr/share/safebox/safebox-guest-blocker /usr/local/bin/safebox
 )
