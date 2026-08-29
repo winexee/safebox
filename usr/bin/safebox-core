@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Robust Engine & Virtual Machine Runtime Core (v1.4.5)
+# SafeBox Robust Engine & Virtual Machine Runtime Core (v1.4.6)
 set -e
 
 RAM_GB="${1:-4}"
@@ -64,6 +64,7 @@ BWRAP_ARGS=(
     --setenv XDG_RUNTIME_DIR /run/user/1000
     --tmpfs /home
     --dir /home/safebox
+    --dir /home/safebox/.local
     --dir /home/safebox/.local/bin
     --setenv HOME /home/safebox
     --setenv USER safebox
@@ -76,9 +77,15 @@ BWRAP_ARGS=(
     --new-session
 )
 
-# Ağ İzni
+# DNS ve Ağ Desteği (systemd-resolved symlink desteğiyle)
 if [ "$NET" = "1" ]; then
-    BWRAP_ARGS+=(--share-net --ro-bind-try /etc/resolv.conf /etc/resolv.conf)
+    BWRAP_ARGS+=(--share-net)
+    if [ -d /run/systemd/resolve ]; then
+        BWRAP_ARGS+=(--ro-bind /run/systemd/resolve /run/systemd/resolve)
+    fi
+    if [ -f /etc/resolv.conf ]; then
+        BWRAP_ARGS+=(--ro-bind-try /etc/resolv.conf /etc/resolv.conf)
+    fi
 fi
 
 # GPU / DRI Aygıtları
