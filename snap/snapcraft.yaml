@@ -1,5 +1,5 @@
 name: safebox
-version: '1.3.4'
+version: '1.3.5'
 summary: Ultra-secure, RAM-backed lightweight sandbox environment
 description: |
   SafeBox creates a volatile, fully isolated desktop sandbox with Bubblewrap.
@@ -7,34 +7,14 @@ description: |
   and wiped completely upon session exit.
 
 grade: stable
-confinement: strict
+confinement: classic
 base: core24
 
 apps:
   safebox:
     command: usr/bin/safebox
-    extensions: [gnome]
-    plugs:
-      - home
-      - x11
-      - wayland
-      - desktop
-      - desktop-legacy
-      - unity7
-      - opengl
-      - network
-      - network-bind
-      - audio-playback
 
 parts:
   safebox-app:
     plugin: dump
     source: .
-    stage-packages:
-      - python3-gi
-      - gir1.2-gtk-3.0
-      - bubblewrap
-      - librsvg2-common
-      - xserver-xephyr
-      - dbus-x11
-      - pulseaudio-utils

@@ -10,7 +10,7 @@ import time
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.3.4"
+VERSION = "1.3.5"
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -491,7 +491,9 @@ class SafeBoxApp(Gtk.Window):
 
     def _run_backend(self, cmd):
         try:
-            subprocess.run(cmd, check=True)
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode != 0:
+                raise subprocess.CalledProcessError(res.returncode, cmd, output=res.stdout, stderr=res.stderr)
         except subprocess.CalledProcessError as e:
             GLib.idle_add(self._show_error, "Sanal Alan Hatası", 
                           f"SafeBox çalıştırılırken hata oluştu.\nÇıkış kodu: {e.returncode}")
