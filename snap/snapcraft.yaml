@@ -1,7 +1,7 @@
 name: safebox
 title: SafeBox
 base: core24
-version: '1.3.0'
+version: '1.3.1'
 summary: Bubblewrap ve MATE tabanli guvenli sanal masaustu
 description: |
   SafeBox, Linux uzerinde guvenilmeyen dosyalari calistirmak, 

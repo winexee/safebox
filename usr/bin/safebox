@@ -1,2 +1,6 @@
 #!/bin/bash
-exec /usr/bin/python3 /usr/share/safebox/safebox_gui.py "$@"
+if [ -n "$SNAP" ]; then
+    exec python3 "$SNAP/usr/share/safebox/safebox_gui.py" "$@"
+else
+    exec python3 "/usr/share/safebox/safebox_gui.py" "$@"
+fi
