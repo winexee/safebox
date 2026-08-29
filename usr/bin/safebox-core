@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Engine (v1.5.2)
+# SafeBox Military-Grade Isolation Engine (v1.5.4)
 set -e
 
 RAM_GB="${1:-4}"
@@ -28,14 +28,13 @@ if [ -z "$TARGET_DISP" ]; then
     echo "[HATA] Boş bir sanal ekran bulunamadı!" >> "$ENGINE_LOG"
     exit 101
 fi
-echo "[BİLGİ] Sanal X11 Display atandı: $TARGET_DISP" >> "$ENGINE_LOG"
 
-# Xephyr Ekranını Başlat
-Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Virtual Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
+# Xephyr Sanal Ekranı
+Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Secure Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
 cleanup() {
-    echo "[BİLGİ] Oturum kapatılıyor, süreçler temizleniyor..." >> "$ENGINE_LOG"
+    echo "[BİLGİ] Oturum sonlandırılıyor..." >> "$ENGINE_LOG"
     kill -9 "$XEPHYR_PID" 2>/dev/null || true
     echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Sanal Makine Kapatıldı ===" >> "$ENGINE_LOG"
 }
@@ -46,7 +45,7 @@ for i in {1..25}; do
     sleep 0.2
 done
 
-# Bubblewrap Parametreleri
+# Bubblewrap Güçlendirilmiş İzolasyon Parametreleri
 BWRAP_ARGS=(
     --ro-bind /usr /usr
     --ro-bind /lib /lib
@@ -69,6 +68,9 @@ BWRAP_ARGS=(
     --setenv LOGNAME safebox
     --setenv DISPLAY "$TARGET_DISP"
     --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
+    # Ana sistemdeki uygulama listesini maskele (İzolasyon Duvarı)
+    --tmpfs /usr/share/applications
+    --ro-bind /usr/share/safebox/guest-apps /usr/share/applications
     --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
     --unshare-all
     --die-with-parent
@@ -107,8 +109,8 @@ if [ "$SHARE_FOLDER" = "1" ]; then
     BWRAP_ARGS+=(--bind "${HOME}/SafeBox-Paylasim" "/home/safebox/Paylasim")
 fi
 
-# X11 Soketi
+# X11 Socket
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
 
-# İzole DBus ile Çalıştır
+# Çalıştır
 bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || true
