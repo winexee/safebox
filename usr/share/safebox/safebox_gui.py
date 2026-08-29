@@ -10,7 +10,7 @@ import time
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
