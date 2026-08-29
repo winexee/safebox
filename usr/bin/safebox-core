@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Hardware Isolation & Namespace Engine (v1.5.7)
+# SafeBox Hardware-Virtualizing Namespace Engine (v1.5.8)
 set -e
 
 RAM_GB="${1:-4}"
@@ -11,13 +11,32 @@ AUDIO="${6:-1}"
 NET="${7:-1}"
 
 LOG_DIR="${HOME}/.local/share/safebox"
+PROC_MOCK_DIR="${LOG_DIR}/mock_proc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR"
 
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Sanal Makine Başlatılıyor ===" > "$ENGINE_LOG"
-echo "Donanım Limiti: ${CPU_CORES} Çekirdek, ${RAM_GB} GB RAM Hedefi" >> "$ENGINE_LOG"
+echo "Donanım Limiti: ${CPU_CORES} Çekirdek, ${RAM_GB} GB Sanal RAM" >> "$ENGINE_LOG"
 
-# 1. Boş bir DISPLAY ekran numarası bul
+# 1. Sanal Bellek (meminfo) Oluşturucu (GB -> kB Çevrimi)
+TOTAL_KB=$((RAM_GB * 1024 * 1024))
+FREE_KB=$((TOTAL_KB * 80 / 100))
+AVAIL_KB=$((TOTAL_KB * 75 / 100))
+
+cat << MEM_EOF > "${PROC_MOCK_DIR}/meminfo"
+MemTotal:       ${TOTAL_KB} kB
+MemFree:        ${FREE_KB} kB
+MemAvailable:   ${AVAIL_KB} kB
+Buffers:           32000 kB
+Cached:           120000 kB
+SwapCached:            0 kB
+Active:           100000 kB
+Inactive:          40000 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+MEM_EOF
+
+# 2. Boş bir DISPLAY ekran numarası bul
 TARGET_DISP=""
 for d in $(seq 10 99); do
     if [ ! -e "/tmp/.X11-unix/X$d" ] && [ ! -e "/tmp/.X$d-lock" ]; then
@@ -31,7 +50,7 @@ if [ -z "$TARGET_DISP" ]; then
     exit 101
 fi
 
-# 2. Xephyr Ekranını Başlat
+# 3. Xephyr Ekranını Başlat
 Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Secure Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
@@ -47,12 +66,12 @@ for i in {1..25}; do
     sleep 0.2
 done
 
-# 3. CPU Çekirdek Sınırlandırmasını Hesapla (0'dan N-1'e kadar)
+# CPU Çekirdek Sınırı (taskset)
 MAX_CORE=$((CPU_CORES - 1))
 if [ "$MAX_CORE" -lt 0 ]; then MAX_CORE=0; fi
 CPU_AFFINITY="0-${MAX_CORE}"
 
-# 4. Bubblewrap Parametreleri (Kernel Hostname & İzolasyon)
+# 4. Bubblewrap İzolasyon Parametreleri (ProcFS Mocking Dahil)
 BWRAP_ARGS=(
     --ro-bind /usr /usr
     --ro-bind /lib /lib
@@ -65,6 +84,8 @@ BWRAP_ARGS=(
     --hostname safebox-sandbox
     --dev /dev
     --proc /proc
+    # Sanallaştırılmış Donanım Bilgisini (/proc/meminfo) Bağla
+    --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
     --tmpfs /tmp
     --tmpfs /var
     --tmpfs /run
@@ -118,8 +139,8 @@ if [ "$SHARE_FOLDER" = "1" ]; then
     BWRAP_ARGS+=(--bind "${HOME}/SafeBox-Paylasim" "/home/safebox/Paylasim")
 fi
 
-# X11 Socket
+# X11 Soketi
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
 
-# 5. taskset ile Seçilen Çekirdeklere Bağlayarak Başlat
+# 5. CPU Çekirdeklerini Tahsis Ederek Çalıştır
 taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || true
