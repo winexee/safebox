@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Military-Grade Isolation Engine (v1.5.4)
+# SafeBox Engine (v1.5.6)
 set -e
 
 RAM_GB="${1:-4}"
@@ -29,7 +29,7 @@ if [ -z "$TARGET_DISP" ]; then
     exit 101
 fi
 
-# Xephyr Sanal Ekranı
+# Xephyr Ekranı
 Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Secure Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
@@ -45,7 +45,7 @@ for i in {1..25}; do
     sleep 0.2
 done
 
-# Bubblewrap Güçlendirilmiş İzolasyon Parametreleri
+# Bubblewrap Güçlendirilmiş İzolasyon ve Kimlik Maskeleme
 BWRAP_ARGS=(
     --ro-bind /usr /usr
     --ro-bind /lib /lib
@@ -53,6 +53,9 @@ BWRAP_ARGS=(
     --ro-bind /bin /bin
     --ro-bind /sbin /sbin
     --ro-bind /etc /etc
+    --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
+    --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
+    --setenv HOSTNAME safebox-sandbox
     --dev /dev
     --proc /proc
     --tmpfs /tmp
@@ -68,7 +71,6 @@ BWRAP_ARGS=(
     --setenv LOGNAME safebox
     --setenv DISPLAY "$TARGET_DISP"
     --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
-    # Ana sistemdeki uygulama listesini maskele (İzolasyon Duvarı)
     --tmpfs /usr/share/applications
     --ro-bind /usr/share/safebox/guest-apps /usr/share/applications
     --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
