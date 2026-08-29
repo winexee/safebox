@@ -6,11 +6,12 @@ import subprocess
 import threading
 import multiprocessing
 import time
+import shutil
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.3.6"
+VERSION = "1.4.0"
 LOG_DIR = os.path.expanduser("~/.local/share/safebox")
 LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -26,6 +27,7 @@ LANGUAGES = {
         'tab2': 'Kaynak ve Ekran',
         'tab3': 'İzinler ve Paylaşım',
         'tab4': 'Konsol & Günlük',
+        'tab_dev': '🛠️ Geliştirici & Teşhis',
         'frame_iso': ' İzolasyon Güvenlik Modeli ',
         'item1_t': 'Kişisel Gizlilik:',
         'item1_d': "Ana ev dizini gizlenir, izole 'safebox' profili atanır.",
@@ -51,7 +53,7 @@ LANGUAGES = {
         'lbl_dev': 'Geliştirici:',
         'btn_pkg': '📦 Paket Bilgisini Göster',
         'lbl_prompt': 'Terminal Komutu >',
-        'hint_cmd': 'örnek: dpkg -l safebox | bwrap --version',
+        'hint_cmd': 'komut veya gizli kod girin (ipucu: developer)',
         'btn_exec': 'Çalıştır',
         'btn_refresh': 'Yenile',
         'btn_export': 'Dışa Aktar (.txt)',
@@ -59,7 +61,7 @@ LANGUAGES = {
         'btn_close': 'Kapat',
         'btn_start': 'Sanal Alanı Başlat',
         'log_header': '=== SafeBox Konsol & Teşhis Merkezi (v{ver}) ===',
-        'log_ready': '[BİLGİ] Konsol hazır.',
+        'log_ready': '[BİLGİ] Konsol hazır. Geliştirici modu için "developer" yazın.',
         'log_reset': 'Konsol günlüğü sıfırlandı.',
         'pkg_check_title': '[SİSTEM PAKET DENETİMİ]:',
         'lang_btn': '🌐 EN'
@@ -71,6 +73,7 @@ LANGUAGES = {
         'tab2': 'Resource & Display',
         'tab3': 'Permissions & Sharing',
         'tab4': 'Console & Logs',
+        'tab_dev': '🛠️ Developer & Diagnostics',
         'frame_iso': ' Isolation Security Model ',
         'item1_t': 'Personal Privacy:',
         'item1_d': "Home directory hidden, isolated 'safebox' profile assigned.",
@@ -96,7 +99,7 @@ LANGUAGES = {
         'lbl_dev': 'Developer:',
         'btn_pkg': '📦 Show Package Info',
         'lbl_prompt': 'Terminal Command >',
-        'hint_cmd': 'example: dpkg -l safebox | bwrap --version',
+        'hint_cmd': 'enter command or secret code (hint: developer)',
         'btn_exec': 'Run',
         'btn_refresh': 'Refresh',
         'btn_export': 'Export (.txt)',
@@ -104,7 +107,7 @@ LANGUAGES = {
         'btn_close': 'Close',
         'btn_start': 'Launch Sandbox',
         'log_header': '=== SafeBox Console & Diagnostic Center (v{ver}) ===',
-        'log_ready': '[INFO] Console ready.',
+        'log_ready': '[INFO] Console ready. Type "developer" for dev options.',
         'log_reset': 'Console log reset.',
         'pkg_check_title': '[SYSTEM PACKAGE CHECK]:',
         'lang_btn': '🌐 TR'
@@ -120,7 +123,7 @@ def _(key, **kwargs):
 class SafeBoxApp(Gtk.Window):
     def __init__(self):
         super().__init__(title=f"SafeBox Kontrol Merkezi (v{VERSION})")
-        self.set_default_size(760, 600)
+        self.set_default_size(780, 620)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.set_border_width(14)
 
@@ -136,6 +139,11 @@ class SafeBoxApp(Gtk.Window):
         .suggested-action:hover {
             background-color: #d64713;
         }
+        .dev-btn {
+            font-weight: bold;
+            background-color: #2b2b2b;
+            color: #00ffcc;
+        }
         notebook tab {
             padding: 8px 14px;
             font-weight: 500;
@@ -145,11 +153,6 @@ class SafeBoxApp(Gtk.Window):
             background-color: #181818;
             color: #4af626;
         }
-        .console-entry {
-            font-family: monospace;
-            background-color: #242424;
-            color: #ffffff;
-        }
         """
         css_provider.load_from_data(css)
         Gtk.StyleContext.add_provider_for_screen(
@@ -158,6 +161,7 @@ class SafeBoxApp(Gtk.Window):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
+        self.dev_mode_active = False
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.add(vbox)
 
@@ -328,6 +332,34 @@ class SafeBoxApp(Gtk.Window):
 
         self.tab4_label = Gtk.Label(label=_('tab4'))
         self.notebook.append_page(tab_log, self.tab4_label)
+
+        # GİZLİ SEKME: Geliştirici & Teşhis Paneli
+        self.tab_dev = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.tab_dev.set_border_width(12)
+
+        dev_grid = Gtk.Grid()
+        dev_grid.set_column_spacing(10)
+        dev_grid.set_row_spacing(10)
+
+        btn_doc = Gtk.Button(label="🩺 SafeBox Doctor (Sistem & İzolasyon Teşhisi)")
+        btn_doc.connect("clicked", lambda w: self.run_doctor_test())
+        dev_grid.attach(btn_doc, 0, 0, 1, 1)
+
+        btn_sys = Gtk.Button(label="📊 Donanım & Çekirdek Özeti (sysinfo)")
+        btn_sys.connect("clicked", lambda w: self.run_sysinfo())
+        dev_grid.attach(btn_sys, 1, 0, 1, 1)
+
+        btn_purge = Gtk.Button(label="🧹 Geçici Bellek ve Log Temizliği (purge)")
+        btn_purge.connect("clicked", lambda w: self.run_purge())
+        dev_grid.attach(btn_purge, 0, 1, 1, 1)
+
+        btn_winexe = Gtk.Button(label="💎 Geliştirici İmzası (winexe)")
+        btn_winexe.connect("clicked", lambda w: self.run_winexe_sign())
+        dev_grid.attach(btn_winexe, 1, 1, 1, 1)
+
+        self.tab_dev.pack_start(dev_grid, False, False, 0)
+        self.tab_dev_label = Gtk.Label(label=_('tab_dev'))
+
         self.load_log()
 
         # Alt Butonlar
@@ -348,6 +380,105 @@ class SafeBoxApp(Gtk.Window):
         btn_bar.pack_end(self.btn_run, False, False, 0)
         vbox.pack_end(btn_bar, False, False, 0)
 
+    def unlock_developer_mode(self):
+        if not self.dev_mode_active:
+            self.dev_mode_active = True
+            self.notebook.append_page(self.tab_dev, self.tab_dev_label)
+            self.show_all()
+            self.notebook.set_current_page(4)
+            self.log_buffer.insert_at_cursor("\n🎉 [GELİŞTİRİCİ MODU AKTİF]: 5. Sekme açıldı! Özel araçları kullanabilirsiniz.\n")
+
+    def run_doctor_test(self):
+        self.notebook.set_current_page(3)
+        self.log_buffer.insert_at_cursor("\n=== 🩺 SafeBox Doctor Teşhis Başlatılıyor ===\n")
+        
+        checks = [
+            ("Bubblewrap (bwrap) İzolasyon Motoru", "which bwrap"),
+            ("Çekirdek Ad Alanı (User Namespaces)", "bwrap --ro-bind / / true"),
+            ("Xephyr Sanal X Sunucusu", "which Xephyr"),
+            ("MATE Oturumu (mate-session)", "which mate-session"),
+            ("D-Bus X11 Yöneticisi", "which dbus-launch"),
+            ("PulseAudio / PipeWire Ses Soketi", "[ -S \"${XDG_RUNTIME_DIR}/pulse/native\" ] || [ -S \"${XDG_RUNTIME_DIR}/pipewire-0\" ]"),
+            ("DRI / 3D Hızlandırma Düğümleri", "[ -d /dev/dri ] || [ -e /dev/nvidia0 ]"),
+            ("Paylaşım Köprüsü (~/SafeBox-Paylasim)", "[ -d ~/SafeBox-Paylasim ] || mkdir -p ~/SafeBox-Paylasim")
+        ]
+
+        for title, cmd in checks:
+            ret = subprocess.run(cmd, shell=True, capture_output=True)
+            status = "[ ✓ BAŞARILI ]" if ret.returncode == 0 else "[ ✗ UYARI / EKSİK ]"
+            self.log_buffer.insert_at_cursor(f"{status.ljust(18)} : {title}\n")
+        
+        self.log_buffer.insert_at_cursor("=== 🩺 Teşhis Tamamlandı ===\n")
+
+    def run_sysinfo(self):
+        self.notebook.set_current_page(3)
+        mem = round(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024.**3), 1)
+        cpus = multiprocessing.cpu_count()
+        uname = os.uname()
+        info = f"\n=== 📊 Sistem Donanım & Çekirdek Raporu ===\n" \
+               f"OS / Kernel  : {uname.sysname} {uname.release} ({uname.machine})\n" \
+               f"İşlemci      : {cpus} Mantıksal Çekirdek (Threads)\n" \
+               f"Toplam RAM   : {mem} GB\n" \
+               f"Masaüstü     : {os.environ.get('XDG_CURRENT_DESKTOP', 'Bilinmiyor')}\n" \
+               f"=========================================\n"
+        self.log_buffer.insert_at_cursor(info)
+
+    def run_purge(self):
+        self.notebook.set_current_page(3)
+        if os.path.exists(LOG_FILE):
+            open(LOG_FILE, 'w').close()
+        self.log_buffer.set_text(_('log_header', ver=VERSION) + "\n" + _('log_reset') + "\n")
+        self.log_buffer.insert_at_cursor("\n[OK] Geçici tamponlar ve loglar temizlendi.\n")
+
+    def run_winexe_sign(self):
+        self.notebook.set_current_page(3)
+        art = r"""
+  ____        __      ____            
+ / ___|  __ _/ _| ___| __ )  _____  __
+ \___ \ / _` | |_/ _ \  _ \ / _ \ \/ /
+  ___) | (_| |  _|  __/ |_) | (_) >  < 
+ |____/ \__,_|_|  \___|____/ \___/_/\_\
+ Developer: Winexe (Mehmet Akif Şahin)
+ SafeBox Secure Sandbox Project
+"""
+        self.log_buffer.insert_at_cursor(f"{art}\n")
+
+    def exec_custom_command(self, widget=None):
+        cmd = self.cmd_entry.get_text().strip()
+        if not cmd:
+            return
+        
+        lower_cmd = cmd.lower()
+        if lower_cmd in ['developer', 'devmode', 'admin', 'unlock']:
+            self.unlock_developer_mode()
+            self.cmd_entry.set_text("")
+            return
+        elif lower_cmd in ['doctor', 'test', 'check']:
+            self.run_doctor_test()
+            self.cmd_entry.set_text("")
+            return
+        elif lower_cmd in ['sysinfo', 'hardware', 'specs']:
+            self.run_sysinfo()
+            self.cmd_entry.set_text("")
+            return
+        elif lower_cmd in ['winexe', 'author', 'about']:
+            self.run_winexe_sign()
+            self.cmd_entry.set_text("")
+            return
+        elif lower_cmd in ['purge', 'clean']:
+            self.run_purge()
+            self.cmd_entry.set_text("")
+            return
+
+        self.log_buffer.insert_at_cursor(f"\n\n$ {cmd}\n")
+        try:
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+            out = res.stdout + res.stderr
+            self.log_buffer.insert_at_cursor(out if out else "[OK]\n")
+        except Exception as e:
+            self.log_buffer.insert_at_cursor(f"[HATA] {str(e)}\n")
+        self.cmd_entry.set_text("")
+
     def populate_res_combo(self, active_idx=1):
         self.res_combo.remove_all()
         for i in range(4):
@@ -367,6 +498,7 @@ class SafeBoxApp(Gtk.Window):
         self.tab2_label.set_text(_('tab2'))
         self.tab3_label.set_text(_('tab3'))
         self.tab4_label.set_text(_('tab4'))
+        self.tab_dev_label.set_text(_('tab_dev'))
 
         self.info_frame.set_label(_('frame_iso'))
         for i, l in enumerate(self.item_labels, start=1):
@@ -417,19 +549,6 @@ class SafeBoxApp(Gtk.Window):
         except Exception as e:
             self.log_buffer.insert_at_cursor(f"\n[HATA] Paket sorgulanamadı: {str(e)}\n")
 
-    def exec_custom_command(self, widget=None):
-        cmd = self.cmd_entry.get_text().strip()
-        if not cmd:
-            return
-        self.log_buffer.insert_at_cursor(f"\n\n$ {cmd}\n")
-        try:
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
-            out = res.stdout + res.stderr
-            self.log_buffer.insert_at_cursor(out if out else "[OK]\n")
-        except Exception as e:
-            self.log_buffer.insert_at_cursor(f"[HATA] {str(e)}\n")
-        self.cmd_entry.set_text("")
-
     def export_log(self, widget=None):
         dialog = Gtk.FileChooserDialog(
             title="Konsol Günlüğünü Kaydet",
@@ -465,11 +584,11 @@ class SafeBoxApp(Gtk.Window):
 
     def _show_error(self, title, message):
         dialog = Gtk.MessageDialog(
-            self,
-            Gtk.DialogFlags.MODAL,
-            Gtk.MessageType.ERROR,
-            Gtk.ButtonsType.OK,
-            title
+            parent=self,
+            flags=Gtk.DialogFlags.MODAL,
+            type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            message_format=title
         )
         dialog.format_secondary_text(message)
         dialog.run()
@@ -495,10 +614,12 @@ class SafeBoxApp(Gtk.Window):
             if res.returncode != 0:
                 raise subprocess.CalledProcessError(res.returncode, cmd, output=res.stdout, stderr=res.stderr)
         except subprocess.CalledProcessError as e:
-            GLib.idle_add(self._show_error, "Sanal Alan Hatası", 
-                          f"SafeBox çalıştırılırken hata oluştu.\nÇıkış kodu: {e.returncode}")
+            err_msg = f"SafeBox sonlandı (Çıkış: {e.returncode})"
+            if e.stderr:
+                err_msg += f"\n\nDetay:\n{e.stderr[:300]}"
+            GLib.idle_add(self._show_error, "Sanal Alan Bildirimi", err_msg)
         except FileNotFoundError:
-            GLib.idle_add(self._show_error, "Hata", "/usr/bin/safebox-core bulunamadı!")
+            GLib.idle_add(self._show_error, "Hata", "safebox-core ikili dosyası bulunamadı!")
         except Exception as e:
             GLib.idle_add(self._show_error, "Hata", str(e))
         finally:
