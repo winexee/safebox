@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Robust Engine (v1.6.1)
+# SafeBox Military-Grade Hardened Engine (v1.6.4)
 set -e
 
 RAM_GB="${1:-4}"
@@ -18,7 +18,7 @@ mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR"
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Sanal Makine Başlatılıyor ===" > "$ENGINE_LOG"
 echo "Donanım Limiti: ${CPU_CORES} Çekirdek, ${RAM_GB} GB RAM" >> "$ENGINE_LOG"
 
-# Sanal RAM (meminfo)
+# 1. Sanal RAM (meminfo)
 TOTAL_KB=$((RAM_GB * 1024 * 1024))
 FREE_KB=$((TOTAL_KB * 80 / 100))
 AVAIL_KB=$((TOTAL_KB * 75 / 100))
@@ -36,6 +36,27 @@ SwapTotal:             0 kB
 SwapFree:              0 kB
 MEM_EOF
 
+# 2. Sanal CPU (/proc/cpuinfo) Mocking
+rm -f "${PROC_MOCK_DIR}/cpuinfo"
+for ((i=0; i<CPU_CORES; i++)); do
+    cat << CPU_EOF >> "${PROC_MOCK_DIR}/cpuinfo"
+processor	: $i
+vendor_id	: GenuineIntel
+cpu family	: 6
+model_name	: SafeBox Virtual Processor (vCPU)
+stepping	: 1
+cpu MHz		: 2500.000
+cache size	: 18432 KB
+physical id	: 0
+siblings	: $CPU_CORES
+core id		: $i
+cpu cores	: $CPU_CORES
+flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx lm constant_tsc rep_good nopl xtopology cpuid pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor
+
+CPU_EOF
+done
+
+# 3. Boş bir DISPLAY ekran numarası bul
 TARGET_DISP=""
 for d in $(seq 10 99); do
     if [ ! -e "/tmp/.X11-unix/X$d" ] && [ ! -e "/tmp/.X$d-lock" ]; then
@@ -49,7 +70,7 @@ if [ -z "$TARGET_DISP" ]; then
     exit 101
 fi
 
-# Xephyr Ekranı
+# 4. Xephyr Ekranı
 Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Secure Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
@@ -69,7 +90,7 @@ MAX_CORE=$((CPU_CORES - 1))
 if [ "$MAX_CORE" -lt 0 ]; then MAX_CORE=0; fi
 CPU_AFFINITY="0-${MAX_CORE}"
 
-# Bubblewrap Parametreleri (/opt ve /dev/shm tarayıcı IPC desteğiyle)
+# 5. Bubblewrap Tam Donanım ve Kullanıcı Yalıtım Parametreleri
 BWRAP_ARGS=(
     --ro-bind /usr /usr
     --ro-bind /lib /lib
@@ -77,7 +98,8 @@ BWRAP_ARGS=(
     --ro-bind /bin /bin
     --ro-bind /sbin /sbin
     --ro-bind /etc /etc
-    --ro-bind-try /opt /opt
+    --ro-bind /usr/share/safebox/guest-etc/passwd /etc/passwd
+    --ro-bind /usr/share/safebox/guest-etc/group /etc/group
     --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
     --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
     --hostname safebox-sandbox
@@ -85,6 +107,10 @@ BWRAP_ARGS=(
     --dev-bind /dev/shm /dev/shm
     --proc /proc
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
+    --ro-bind "${PROC_MOCK_DIR}/cpuinfo" /proc/cpuinfo
+    # Donanım sızıntılarını önlemek için /sys maskelemesi
+    --tmpfs /sys
+    --ro-bind-try /sys/devices/system/cpu /sys/devices/system/cpu
     --tmpfs /tmp
     --tmpfs /var
     --tmpfs /run
@@ -97,7 +123,7 @@ BWRAP_ARGS=(
     --setenv USER safebox
     --setenv LOGNAME safebox
     --setenv DISPLAY "$TARGET_DISP"
-    --setenv PATH "/home/safebox/.local/bin:/opt/firefox:/usr/local/bin:/usr/bin:/bin"
+    --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
     --tmpfs /usr/share/applications
     --ro-bind /usr/share/safebox/guest-apps /usr/share/applications
     --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
