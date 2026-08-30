@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Military-Grade Hardened Engine (v1.6.4)
+# SafeBox Hardened Virtual Hardware & Namespace Engine (v1.6.5)
 set -e
 
 RAM_GB="${1:-4}"
@@ -12,13 +12,14 @@ NET="${7:-1}"
 
 LOG_DIR="${HOME}/.local/share/safebox"
 PROC_MOCK_DIR="${LOG_DIR}/mock_proc"
+SYS_MOCK_DIR="${LOG_DIR}/mock_sys"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
-mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR"
+mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu"
 
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Sanal Makine Başlatılıyor ===" > "$ENGINE_LOG"
-echo "Donanım Limiti: ${CPU_CORES} Çekirdek, ${RAM_GB} GB RAM" >> "$ENGINE_LOG"
+echo "İzolasyon: ${CPU_CORES} Çekirdek, ${RAM_GB} GB RAM" >> "$ENGINE_LOG"
 
-# 1. Sanal RAM (meminfo)
+# 1. Sanal Bellek (/proc/meminfo)
 TOTAL_KB=$((RAM_GB * 1024 * 1024))
 FREE_KB=$((TOTAL_KB * 80 / 100))
 AVAIL_KB=$((TOTAL_KB * 75 / 100))
@@ -36,8 +37,10 @@ SwapTotal:             0 kB
 SwapFree:              0 kB
 MEM_EOF
 
-# 2. Sanal CPU (/proc/cpuinfo) Mocking
-rm -f "${PROC_MOCK_DIR}/cpuinfo"
+# 2. Sanal CPU (/proc/cpuinfo & /proc/stat)
+rm -f "${PROC_MOCK_DIR}/cpuinfo" "${PROC_MOCK_DIR}/stat"
+echo "cpu  2000 0 2000 20000 0 0 0 0 0 0" > "${PROC_MOCK_DIR}/stat"
+
 for ((i=0; i<CPU_CORES; i++)); do
     cat << CPU_EOF >> "${PROC_MOCK_DIR}/cpuinfo"
 processor	: $i
@@ -54,9 +57,16 @@ cpu cores	: $CPU_CORES
 flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx lm constant_tsc rep_good nopl xtopology cpuid pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor
 
 CPU_EOF
+    echo "cpu$i 1000 0 1000 10000 0 0 0 0 0 0" >> "${PROC_MOCK_DIR}/stat"
 done
 
-# 3. Boş bir DISPLAY ekran numarası bul
+# Sanal Sys CPU Online
+MAX_CORE=$((CPU_CORES - 1))
+if [ "$MAX_CORE" -lt 0 ]; then MAX_CORE=0; fi
+echo "0-${MAX_CORE}" > "${SYS_MOCK_DIR}/devices/system/cpu/online"
+CPU_AFFINITY="0-${MAX_CORE}"
+
+# 3. Sanal Display Bul
 TARGET_DISP=""
 for d in $(seq 10 99); do
     if [ ! -e "/tmp/.X11-unix/X$d" ] && [ ! -e "/tmp/.X$d-lock" ]; then
@@ -66,16 +76,15 @@ for d in $(seq 10 99); do
 done
 
 if [ -z "$TARGET_DISP" ]; then
-    echo "[HATA] Boş bir sanal ekran bulunamadı!" >> "$ENGINE_LOG"
+    echo "[HATA] Boş ekran bulunamadı!" >> "$ENGINE_LOG"
     exit 101
 fi
 
-# 4. Xephyr Ekranı
 Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Secure Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
 cleanup() {
-    echo "[BİLGİ] Oturum sonlandırılıyor..." >> "$ENGINE_LOG"
+    echo "[BİLGİ] Oturum kapatılıyor..." >> "$ENGINE_LOG"
     kill -9 "$XEPHYR_PID" 2>/dev/null || true
     echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Sanal Makine Kapatıldı ===" >> "$ENGINE_LOG"
 }
@@ -86,11 +95,7 @@ for i in {1..25}; do
     sleep 0.2
 done
 
-MAX_CORE=$((CPU_CORES - 1))
-if [ "$MAX_CORE" -lt 0 ]; then MAX_CORE=0; fi
-CPU_AFFINITY="0-${MAX_CORE}"
-
-# 5. Bubblewrap Tam Donanım ve Kullanıcı Yalıtım Parametreleri
+# 4. Bubblewrap İzolasyon Parametreleri
 BWRAP_ARGS=(
     --ro-bind /usr /usr
     --ro-bind /lib /lib
@@ -100,6 +105,8 @@ BWRAP_ARGS=(
     --ro-bind /etc /etc
     --ro-bind /usr/share/safebox/guest-etc/passwd /etc/passwd
     --ro-bind /usr/share/safebox/guest-etc/group /etc/group
+    --ro-bind /usr/share/safebox/guest-etc/shadow /etc/shadow
+    --ro-bind /usr/share/safebox/guest-etc/nsswitch.conf /etc/nsswitch.conf
     --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
     --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
     --hostname safebox-sandbox
@@ -108,9 +115,10 @@ BWRAP_ARGS=(
     --proc /proc
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
     --ro-bind "${PROC_MOCK_DIR}/cpuinfo" /proc/cpuinfo
-    # Donanım sızıntılarını önlemek için /sys maskelemesi
+    --ro-bind "${PROC_MOCK_DIR}/stat" /proc/stat
+    # Donanım Sızıntılarını Kökten Engelleyen /sys Maskelemesi
     --tmpfs /sys
-    --ro-bind-try /sys/devices/system/cpu /sys/devices/system/cpu
+    --ro-bind "${SYS_MOCK_DIR}/devices/system/cpu/online" /sys/devices/system/cpu/online
     --tmpfs /tmp
     --tmpfs /var
     --tmpfs /run
@@ -167,5 +175,5 @@ fi
 # X11 Socket
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
 
-# Çalıştır
+# 5. taskset ile Seçilen Çekirdeklere Bağlayarak Başlat
 taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || true
