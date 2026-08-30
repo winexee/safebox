@@ -14,7 +14,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.6.9"
+VERSION = "1.7.1"
 
 class SafeBoxGUI(Gtk.Window):
     def __init__(self):
