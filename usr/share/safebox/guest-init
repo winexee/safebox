@@ -7,12 +7,14 @@ export XDG_DATA_DIRS=/usr/share/cinnamon:/usr/share/gnome:/usr/local/share/:/usr
 export XDG_CURRENT_DESKTOP=X-Cinnamon
 export XDG_SESSION_DESKTOP=cinnamon
 export DESKTOP_SESSION=cinnamon
+export CINNAMON_2D=1
+export LIBGL_ALWAYS_SOFTWARE=1
 export GIO_USE_VFS=local
 export GVFS_DISABLE_FUSE=1
 
 mkdir -p /home/safebox/{Desktop,Masaüstü,İndirilenler,Belgeler,Paylasim}
 
-# Masaüstü Kısayolları
+# Masaüstü Simgeleri
 for app in browser home share terminal editor monitor; do
     if [ -f "/usr/share/safebox/guest-apps/${app}.desktop" ]; then
         cp "/usr/share/safebox/guest-apps/${app}.desktop" /home/safebox/Desktop/ 2>/dev/null || true
@@ -21,19 +23,13 @@ for app in browser home share terminal editor monitor; do
 done
 chmod +x /home/safebox/Desktop/*.desktop /home/safebox/Masaüstü/*.desktop 2>/dev/null || true
 
-cat << 'BASH_EOF' > /home/safebox/.bashrc
-export PS1='\[\033[01;32m\]safebox@safebox-sandbox\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
-alias ll='ls -alF'
-BASH_EOF
-
-# Cinnamon tam oturumunu başlat (Yedek olarak cinnamon --replace içerir)
-if which cinnamon-session >/dev/null 2>&1; then
-    exec cinnamon-session
-elif which cinnamon >/dev/null 2>&1; then
-    cinnamon --replace 2>/dev/null &
-    wait $!
+# Cinnamon Masaüstünü 2D Modunda Güvenle Başlat
+if which cinnamon2d >/dev/null 2>&1; then
+    exec cinnamon2d
+elif which cinnamon-session >/dev/null 2>&1; then
+    exec cinnamon-session --session=cinnamon2d
 else
-    # Fallback (Cinnamon bulunamazsa sistemin çökmesini engeller)
+    # Fallback
     xfwm4 &
     pcmanfm --desktop &
     tint2 &

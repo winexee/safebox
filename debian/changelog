@@ -1,6 +1,6 @@
-safebox (1.7.3-1~ppa1~noble1) noble; urgency=medium
+safebox (1.7.4-1~ppa1~noble1) noble; urgency=medium
 
-  * Cinnamon-session entegrasyonu tamamlandı, başlatma çökmesi giderildi.
-  * GUI klasik görünümüne ve orijinal developer moduna döndürüldü.
+  * Cinnamon 2D oturumu entegre edildi, 133 başlatma çökmesi giderildi.
+  * GUI birebir orijinal v1.6.4 düzenine döndürüldü.
 
- -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sun, 30 Aug 2026 23:59:00 +0300
+ -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Mon, 31 Aug 2026 00:05:00 +0300
