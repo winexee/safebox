@@ -1,37 +1,86 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
 export HOME=/home/safebox
 export USER=safebox
 export LOGNAME=safebox
 
-export XDG_DATA_DIRS=/usr/share/cinnamon:/usr/share/gnome:/usr/local/share/:/usr/share/
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_DATA_DIRS="/usr/share:/usr/local/share"
+
+export XDG_SESSION_TYPE=x11
 export XDG_CURRENT_DESKTOP=X-Cinnamon
 export XDG_SESSION_DESKTOP=cinnamon
 export DESKTOP_SESSION=cinnamon
-export CINNAMON_2D=1
-export LIBGL_ALWAYS_SOFTWARE=1
+
 export GIO_USE_VFS=local
 export GVFS_DISABLE_FUSE=1
+export GTK_THEME="Yaru-sage-dark"
 
-mkdir -p /home/safebox/{Desktop,Masaüstü,İndirilenler,Belgeler,Paylasim}
+# Cinnamon/Xephyr tanı modu:
+# DRI3/GPU erişimini devreden çıkarıp Mutter'ı yazılımsal render ile çalıştır.
+export LIBGL_ALWAYS_SOFTWARE=1
+export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
+export GDK_DISABLE_GL=1
+export CLUTTER_PAINT=disable-clipped-redraws:disable-culling
 
-# Masaüstü Simgeleri
+# X11 için gerekli dizin
+mkdir -p /tmp/.ICE-unix
+chmod 1777 /tmp/.ICE-unix
+
+# Guest dizinleri
+mkdir -p \
+    "$HOME/Desktop" \
+    "$HOME/Masaüstü" \
+    "$HOME/Belgeler" \
+    "$HOME/Documents" \
+    "$HOME/İndirilenler" \
+    "$HOME/Downloads" \
+    "$HOME/Resimler" \
+    "$HOME/Pictures" \
+    "$HOME/.config/gtk-3.0" \
+    "$HOME/.config/gtk-4.0" \
+    "$HOME/.config/cinnamon" \
+    "$HOME/.cache" \
+    "$HOME/.local/share"
+
+# GTK 3
+cat > "$HOME/.config/gtk-3.0/settings.ini" <<'GTK3_EOF'
+[Settings]
+gtk-theme-name=Yaru-sage-dark
+gtk-icon-theme-name=Yaru-sage-dark
+gtk-font-name=Ubuntu 10
+gtk-application-prefer-dark-theme=1
+GTK3_EOF
+
+# GTK 4
+cat > "$HOME/.config/gtk-4.0/settings.ini" <<'GTK4_EOF'
+[Settings]
+gtk-theme-name=Yaru-sage-dark
+gtk-icon-theme-name=Yaru-sage-dark
+gtk-font-name=Ubuntu 10
+gtk-application-prefer-dark-theme=1
+GTK4_EOF
+
+# Uygulama kısayolları
+rm -f "$HOME/Desktop/"*.desktop "$HOME/Masaüstü/"*.desktop 2>/dev/null || true
+
 for app in browser home share terminal editor monitor; do
     if [ -f "/usr/share/safebox/guest-apps/${app}.desktop" ]; then
-        cp "/usr/share/safebox/guest-apps/${app}.desktop" /home/safebox/Desktop/ 2>/dev/null || true
-        cp "/usr/share/safebox/guest-apps/${app}.desktop" /home/safebox/Masaüstü/ 2>/dev/null || true
+        cp "/usr/share/safebox/guest-apps/${app}.desktop" "$HOME/Desktop/" 2>/dev/null || true
+        cp "/usr/share/safebox/guest-apps/${app}.desktop" "$HOME/Masaüstü/" 2>/dev/null || true
     fi
 done
-chmod +x /home/safebox/Desktop/*.desktop /home/safebox/Masaüstü/*.desktop 2>/dev/null || true
 
-# Cinnamon Masaüstünü 2D Modunda Güvenle Başlat
-if which cinnamon2d >/dev/null 2>&1; then
-    exec cinnamon2d
-elif which cinnamon-session >/dev/null 2>&1; then
-    exec cinnamon-session --session=cinnamon2d
-else
-    # Fallback
-    xfwm4 &
-    pcmanfm --desktop &
-    tint2 &
-    wait
-fi
+chmod +x "$HOME/Desktop/"*.desktop "$HOME/Masaüstü/"*.desktop 2>/dev/null || true
+
+# ---------------------------------------------------------------
+# ÖNEMLİ:
+# Cinnamon başlamadan önce nemo-desktop,
+# cinnamon-settings-daemon veya gsettings çalıştırmıyoruz.
+# Cinnamon kendi monitor/panel initialization'ını önce yapsın.
+# ---------------------------------------------------------------
+
+exec cinnamon --sm-disable

@@ -1,0 +1,17 @@
+# Snapcraft build çıktıları
+stage/
+prime/
+parts/
+.craft/
+
+# Paket çıktıları
+*.snap
+*.deb
+
+# Python geçici dosyaları
+__pycache__/
+*.pyc
+
+# Yerel test / backup dosyaları
+*.backup
+*.bak

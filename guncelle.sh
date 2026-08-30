@@ -1,3 +1,6 @@
+cd ~/safebox
+
+cat << 'EOF' > usr/bin/safebox-core
 #!/usr/bin/env bash
 # SafeBox Enterprise Hardened Engine (v1.7.1 - Bugfix)
 set -euo pipefail
@@ -123,20 +126,6 @@ if [ "$XEPHYR_READY" -eq 0 ]; then
     exit 102
 fi
 
-# Xephyr tek bir "default" output sağlar.
-# Cinnamon'un primary monitor algılayabilmesi için bunu açıkça primary yap.
-PRIMARY_OUTPUT="$(DISPLAY="$TARGET_DISP" xrandr --query 2>/dev/null | awk '/ connected/{print $1; exit}')"
-
-if [ -n "$PRIMARY_OUTPUT" ]; then
-    if DISPLAY="$TARGET_DISP" xrandr --output "$PRIMARY_OUTPUT" --primary >> "$ENGINE_LOG" 2>&1; then
-        echo "[OK] X11 primary output: $PRIMARY_OUTPUT" >> "$ENGINE_LOG"
-    else
-        echo "[UYARI] Primary output ayarlanamadı: $PRIMARY_OUTPUT" >> "$ENGINE_LOG"
-    fi
-else
-    echo "[UYARI] X11 connected output bulunamadı." >> "$ENGINE_LOG"
-fi
-
 # 5. HATA DÜZELTMESİ: --dev /dev Geri Getirildi (Terminal PTS çökmelerini önler)
 BWRAP_ARGS=(
     --unshare-all
@@ -232,3 +221,8 @@ if which systemd-run >/dev/null 2>&1; then
 else
     taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1
 fi
+EOF
+
+chmod +x usr/bin/safebox-core
+sudo cp usr/bin/safebox-core /usr/bin/safebox-core
+sudo cp usr/bin/safebox-core /usr/local/bin/safebox-core
