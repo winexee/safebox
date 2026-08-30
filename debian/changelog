@@ -7,4 +7,4 @@ safebox (1.6.9-1~ppa1~noble1) noble; urgency=medium
   * P1: || true kaldırıldı, Xephyr zaman aşımı ve süreç sağlık denetimi eklendi.
   * P2 & P3: Tüm sürümler 1.6.9 olarak eşitlendi.
 
- -- Winexe <winexee@gmail.com>  Sun, 30 Aug 2026 21:00:00 +0300
+ -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sun, 30 Aug 2026 21:00:00 +0300

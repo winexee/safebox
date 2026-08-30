@@ -1,7 +1,7 @@
 Source: safebox
 Section: utils
 Priority: optional
-Maintainer: Winexe <winexee@gmail.com>
+Maintainer: Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>
 Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.6.2
 Homepage: https://github.com/winexee/safebox
