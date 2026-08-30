@@ -1,8 +1,8 @@
 Package: safebox
-Version: 1.6.9-1~ppa1~noble1
+Version: 1.7.2-1~ppa1~noble1
 Architecture: all
-Maintainer: Winexe <winexee@gmail.com>
-Installed-Size: 38
+Maintainer: Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>
+Installed-Size: 37
 Depends: bubblewrap, xserver-xephyr, dbus-x11, python3, python3-gi, gir1.2-gtk-3.0, xfwm4, xfdesktop4, thunar, mousepad, xfce4-terminal, mate-system-monitor, tint2, rofi, epiphany-browser, feh, hsetroot, yaru-theme-icon, yaru-theme-gtk
 Section: utils
 Priority: optional

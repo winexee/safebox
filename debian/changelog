@@ -1,7 +1,6 @@
-safebox (1.7.1-1~ppa1~noble1) noble; urgency=medium
+safebox (1.7.2-1~ppa1~noble1) noble; urgency=medium
 
-  * Bugfix: XFCE terminal çökmelerini önlemek için --dev /dev geri getirildi (PTS desteği).
-  * Bugfix: Seçilen CPU çekirdeğinin host sınırını aşması durumunda oluşan taskset hatası giderildi.
-  * Bugfix: dbus-uuidgen olmayan sistemler için /proc/sys/kernel/random/uuid yedeği eklendi.
+  * GUI klasik görünüme döndürüldü.
+  * Masaüstü ortamı Cinnamon olarak güncellendi.
 
- -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sun, 30 Aug 2026 22:45:00 +0300
+ -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sun, 30 Aug 2026 23:55:00 +0300
