@@ -1,5 +1,9 @@
-safebox (1.2.3-1~ppa1~noble1) noble; urgency=medium
+safebox (1.6.4-1~ppa1~noble1) noble; urgency=medium
 
-  * v1.2.3: Teşhis konsolu entegrasyonu, XML &amp; karakter düzeltmesi ve Winexe yayıncı optimizasyonu.
+  * Tam Donanım İzolasyonu: /proc/meminfo ve /proc/cpuinfo sanallaştırması.
+  * Kimlik Maskeleme: /etc/passwd, /etc/group, hostname ve /sys yalıtımı.
+  * Modern XFCE4 ve Rofi Dock Menü Entegrasyonu.
+  * WebKit / Epiphany tarayıcı için IPC ve Sandbox uyumluluğu.
+  * MATE Sistem Gözlemcisi ve canlı donanım monitörü.
 
- -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sat, 29 Aug 2026 15:45:00 +0300
+ -- Winexe <winexee@gmail.com>  Sun, 30 Aug 2026 03:00:00 +0300
