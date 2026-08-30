@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SafeBox Control Center - v1.7.4
+SafeBox Control Center - v1.7.5
 Original Classic UI & Cinnamon Integration
 """
 
@@ -14,7 +14,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.7.4"
+VERSION = "1.7.5"
 
 class SafeBoxGUI(Gtk.Window):
     def __init__(self):

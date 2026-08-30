@@ -27,7 +27,12 @@ Depends: ${misc:Depends},
          feh,
          hsetroot,
          yaru-theme-icon,
-         yaru-theme-gtk
+         yaru-theme-gtk,
+         cinnamon,
+         cinnamon-session,
+         cinnamon-settings-daemon,
+         nemo,
+         cinnamon-screensaver
 Description: Guvenli ve tam izole sanal masaustu ortami
  SafeBox; Bubblewrap, XFCE4 ve Xephyr altyapisini birlestirerek 
  tam donanim izolasyonlu (CPU/RAM/Hostname/Passwd) ve izole 

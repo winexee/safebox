@@ -1,3 +1,11 @@
+safebox (1.7.5-1~ppa1~noble1) noble; urgency=medium
+
+  * Cinnamon sandbox altyapısı için sürüm ve paket bağımlılıkları tekilleştirildi.
+  * Geçici GPU yazılımsal-render tanı ayarları kaldırıldı.
+  * SafeBox core ve GUI sürümleri 1.7.5 altında eşitlendi.
+
+ -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Mon, 31 Aug 2026 00:00:00 +0300
+
 safebox (1.7.4-1~ppa1~noble1) noble; urgency=medium
 
   * Cinnamon 2D oturumu entegre edildi, 133 başlatma çökmesi giderildi.

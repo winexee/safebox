@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# SafeBox Classic GUI & Cinnamon Desktop Update - Only Git (v1.7.2)
+# SafeBox Classic GUI & Cinnamon Desktop Update - SafeBox 1.7.5 development
 set -e
 
 echo "=== Cinnamon Paketleri Kuruluyor ==="
 sudo apt update
 sudo apt install -y cinnamon-core
 
-# 1. Klasik GUI Arayüzü (v1.7.2)
+# 1. Cinnamon GUI Arayüzü (v1.7.5)
 cat << 'EOF' > usr/share/safebox/safebox_gui.py
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SafeBox Control Center - v1.7.2
+SafeBox Control Center - v1.7.5
 Classic GUI & Cinnamon Desktop Integration
 """
 
@@ -25,7 +25,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.7.2"
+VERSION = "1.7.5"
 
 class SafeBoxGUI(Gtk.Window):
     def __init__(self):
@@ -293,14 +293,12 @@ sudo cp usr/share/safebox/guest-init /usr/share/safebox/
 
 # 3. Yerel Paketi Derle ve Kendi Bilgisayarına Kur
 dpkg-buildpackage -us -uc -b
-sudo dpkg -i ../safebox_1.7.2-1~ppa1~noble1_all.deb
+# Paket kurulumunu burada otomatik yapma.
 
 # 4. Sadece GitHub'a Yükle
 git add usr/share/safebox/safebox_gui.py usr/share/safebox/guest-init debian/
-git commit -m "UI Revert to Classic & Switch to Cinnamon Desktop (v1.7.2)" || true
-git tag -d v1.7.2 2>/dev/null || true
-git push origin :refs/tags/v1.7.2 2>/dev/null || true
-git tag -a v1.7.2 -m "SafeBox v1.7.2 - Classic GUI & Cinnamon Desktop"
-git push origin main --tags
+# Git commit/tag/push işlemleri otomatik yapılmaz.
+# Yayın işlemi geliştirici tarafından ayrı olarak yapılmalıdır.
+# Otomatik GitHub push kaldırıldı.
 
 echo "✅ Kodlar GitHub'a yüklendi ve bilgisayarına kuruldu (Launchpad atlandı)!"

@@ -19,13 +19,6 @@ export GIO_USE_VFS=local
 export GVFS_DISABLE_FUSE=1
 export GTK_THEME="Yaru-sage-dark"
 
-# Cinnamon/Xephyr tanı modu:
-# DRI3/GPU erişimini devreden çıkarıp Mutter'ı yazılımsal render ile çalıştır.
-export LIBGL_ALWAYS_SOFTWARE=1
-export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
-export GDK_DISABLE_GL=1
-export CLUTTER_PAINT=disable-clipped-redraws:disable-culling
-
 # X11 için gerekli dizin
 mkdir -p /tmp/.ICE-unix
 chmod 1777 /tmp/.ICE-unix
