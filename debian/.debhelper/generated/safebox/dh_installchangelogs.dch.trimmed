@@ -1,6 +1,6 @@
-safebox (1.7.2-1~ppa1~noble1) noble; urgency=medium
+safebox (1.7.3-1~ppa1~noble1) noble; urgency=medium
 
-  * GUI klasik görünüme döndürüldü.
-  * Masaüstü ortamı Cinnamon olarak güncellendi.
+  * Cinnamon-session entegrasyonu tamamlandı, başlatma çökmesi giderildi.
+  * GUI klasik görünümüne ve orijinal developer moduna döndürüldü.
 
- -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sun, 30 Aug 2026 23:55:00 +0300
+ -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sun, 30 Aug 2026 23:59:00 +0300

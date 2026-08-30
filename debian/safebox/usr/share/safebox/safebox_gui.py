@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SafeBox Control Center - v1.7.2
-Classic GUI & Cinnamon Desktop Integration
+SafeBox Control Center - v1.7.3
+Classic Interface with Cinnamon Session Support
 """
 
 import os
@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.7.2"
+VERSION = "1.7.3"
 
 class SafeBoxGUI(Gtk.Window):
     def __init__(self):
@@ -24,6 +24,8 @@ class SafeBoxGUI(Gtk.Window):
         self.set_position(Gtk.WindowPosition.CENTER)
         self.set_icon_name("security-high")
 
+        self.dev_mode = False
+
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         vbox.set_margin_top(12)
         vbox.set_margin_bottom(12)
@@ -31,7 +33,7 @@ class SafeBoxGUI(Gtk.Window):
         vbox.set_margin_end(14)
         self.add(vbox)
 
-        # Başlık
+        # Klasik Başlık
         header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         icon_img = Gtk.Image.new_from_icon_name("security-high", Gtk.IconSize.DIALOG)
         header_box.pack_start(icon_img, False, False, 0)
@@ -63,7 +65,7 @@ class SafeBoxGUI(Gtk.Window):
         lbl1.set_xalign(0)
         lbl2 = Gtk.Label(label="  izole bir Bubblewrap sanal alanında çalıştırmanızı sağlar.")
         lbl2.set_xalign(0)
-        lbl3 = Gtk.Label(label="• Sanal alandaki hiçbir işlem, izin vermediğiniz sürece host sisteme erişemez.")
+        lbl3 = Gtk.Label(label="• Sanal alandaki hiçbir işlem, izin vermediğiniz sürece ana sisteminize erişemez.")
         lbl3.set_xalign(0)
         
         info_box.pack_start(lbl1, False, False, 0)
@@ -142,7 +144,7 @@ class SafeBoxGUI(Gtk.Window):
         cmd_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         cmd_lbl = Gtk.Label(label="Komut:")
         self.cmd_entry = Gtk.Entry()
-        self.cmd_entry.set_placeholder_text("doctor, sysinfo, purge, clear")
+        self.cmd_entry.set_placeholder_text("developer, doctor, sysinfo, purge, clear")
         self.cmd_entry.connect("activate", self.on_run_command)
         btn_run = Gtk.Button(label="Çalıştır")
         btn_run.connect("clicked", self.on_run_command)
@@ -176,19 +178,24 @@ class SafeBoxGUI(Gtk.Window):
         self.console_view.scroll_to_mark(mark, 0.05, True, 0.0, 1.0)
 
     def on_run_command(self, widget):
-        cmd = self.cmd_entry.get_text().strip().lower()
+        raw_cmd = self.cmd_entry.get_text().strip()
         self.cmd_entry.set_text("")
-        if not cmd:
+        if not raw_cmd:
             return
 
-        self.append_log(f"> {cmd}")
+        cmd = raw_cmd.lower()
+        self.append_log(f"> {raw_cmd}")
         
         if cmd == "clear":
             self.console_view.get_buffer().set_text("")
+        elif cmd == "developer":
+            self.dev_mode = not self.dev_mode
+            status_text = "AÇIK" if self.dev_mode else "KAPALI"
+            self.append_log(f"Geliştirici Modu: {status_text}")
         elif cmd == "status":
-            self.append_log("SafeBox Durumu: Hazır\nMasaüstü Ortamı: Cinnamon")
+            self.append_log("SafeBox Durumu: Hazır\nMasaüstü Ortamı: Cinnamon Desktop")
         elif cmd == "sysinfo":
-            self.append_log(f"SafeBox Sürüm: {VERSION}\nSandbox İzolasyon: Aktif")
+            self.append_log(f"SafeBox Sürüm: {VERSION}\nMasaüstü: Cinnamon\nİzolasyon: Aktif")
         elif cmd == "purge":
             mock_dir = os.path.expanduser("~/.local/share/safebox")
             for item in ["mock_proc", "mock_sys", "mock_etc"]:
@@ -200,7 +207,17 @@ class SafeBoxGUI(Gtk.Window):
             self.append_log("Sandbox bütünlüğü ve izolasyon limitleri test ediliyor...")
             self.append_log("[PASS] Çekirdek İzolasyonu\n[PASS] Cinnamon Masaüstü Yalıtımı")
         else:
-            self.append_log(f"Geçersiz komut. (İzin verilenler: doctor, status, sysinfo, purge, clear)")
+            if self.dev_mode:
+                try:
+                    res = subprocess.run(raw_cmd, shell=True, capture_output=True, text=True, timeout=5)
+                    if res.stdout:
+                        self.append_log(res.stdout.strip())
+                    if res.stderr:
+                        self.append_log(f"[STDERR] {res.stderr.strip()}")
+                except Exception as e:
+                    self.append_log(f"[HATA] Komut yürütülemedi: {e}")
+            else:
+                self.append_log(f"Geçersiz komut. (İzin verilenler: developer, doctor, status, sysinfo, purge, clear)")
 
     def on_start_sandbox(self, widget):
         ram = self.ram_combo.get_active_text().split()[0]
