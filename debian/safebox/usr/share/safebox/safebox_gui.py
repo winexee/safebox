@@ -1,272 +1,261 @@
 #!/usr/bin/env python3
-import gi
+# -*- coding: utf-8 -*-
+"""
+SafeBox Control Center - v1.6.9
+Hardened Namespace Sandbox Manager
+"""
+
 import os
+import sys
 import subprocess
 import threading
-import multiprocessing
-import time
+import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-LOG_DIR = os.path.expanduser("~/.local/share/safebox")
-LOG_FILE = os.path.join(LOG_DIR, "safebox.log")
-os.makedirs(LOG_DIR, exist_ok=True)
+VERSION = "1.6.9"
 
-class SafeBoxApp(Gtk.Window):
+class SafeBoxGUI(Gtk.Window):
     def __init__(self):
-        super().__init__(title="SafeBox Kontrol Merkezi")
-        self.set_default_size(720, 560)
+        super().__init__(title=f"SafeBox Kontrol Merkezi (v{VERSION})")
+        self.set_default_size(780, 520)
         self.set_position(Gtk.WindowPosition.CENTER)
-        self.set_border_width(16)
+        self.set_icon_name("security-high")
 
-        css_provider = Gtk.CssProvider()
-        css = b"""
-        .suggested-action {
-            background-color: #E95420;
-            color: white;
-            font-weight: bold;
-            border-radius: 6px;
-            padding: 8px 16px;
-        }
-        .suggested-action:hover {
-            background-color: #d64713;
-        }
-        notebook tab {
-            padding: 8px 14px;
-            font-weight: 500;
-        }
-        textview text {
-            font-family: monospace;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-        }
-        """
-        css_provider.load_from_data(css)
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        self.dev_unlocked = False
 
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        vbox.set_margin_top(12)
+        vbox.set_margin_bottom(12)
+        vbox.set_margin_start(14)
+        vbox.set_margin_end(14)
         self.add(vbox)
 
-        # Üst Başlık
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
-        icon = Gtk.Image.new_from_icon_name("security-high", Gtk.IconSize.DIALOG)
-        header.pack_start(icon, False, False, 0)
+        # Başlık Çubuğu
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        icon_img = Gtk.Image.new_from_icon_name("security-high", Gtk.IconSize.DIALOG)
+        header_box.pack_start(icon_img, False, False, 0)
 
-        tbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        lbl_title = Gtk.Label()
-        lbl_title.set_markup("<span size='x-large' weight='bold' foreground='#E95420'>SafeBox Güvenli Alan</span>")
-        lbl_title.set_halign(Gtk.Align.START)
-        lbl_sub = Gtk.Label(label="Tam izole, modern MATE sanal masaüstü ve güvenlik denetimi")
-        lbl_sub.set_halign(Gtk.Align.START)
-        tbox.pack_start(lbl_title, False, False, 0)
-        tbox.pack_start(lbl_sub, False, False, 0)
-        header.pack_start(tbox, True, True, 0)
-        vbox.pack_start(header, False, False, 0)
+        title_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        title_lbl = Gtk.Label()
+        title_lbl.set_markup(f"<b><big>SafeBox Güvenli Alan</big></b> <small>v{VERSION}</small>")
+        title_lbl.set_xalign(0)
+        sub_lbl = Gtk.Label(label="Hardened Sandbox Ortamı, cgroup v2 Donanım İzolasyonu ve Güvenli Konsol")
+        sub_lbl.set_xalign(0)
+        title_vbox.pack_start(title_lbl, False, False, 0)
+        title_vbox.pack_start(sub_lbl, False, False, 0)
+        header_box.pack_start(title_vbox, True, True, 0)
 
-        vbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
+        vbox.pack_start(header_box, False, False, 0)
 
         # Sekmeler
         notebook = Gtk.Notebook()
         vbox.pack_start(notebook, True, True, 0)
 
-        # SEKME 1: Genel Bakış
-        tab1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        tab1.set_border_width(12)
-        info_frame = Gtk.Frame(label=" İzolasyon Güvenlik Modeli ")
-        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        info_box.set_border_width(12)
+        # 1. Sekme: Genel Bakış
+        tab_general = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        tab_general.set_margin_top(12)
+        
+        info_frame = Gtk.Frame(label="Güvenlik Profili")
+        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        info_box.set_margin_start(10)
+        info_box.set_margin_top(8)
+        info_box.set_margin_bottom(8)
+        
+        lbl1 = Gtk.Label(label="• Çekirdek İzolasyonu: Bubblewrap User, PID, UTS, IPC & Mount Namespaces")
+        lbl1.set_xalign(0)
+        lbl2 = Gtk.Label(label="• Gerçek Donanım Sınırı: Linux cgroup v2 (MemoryMax & CPUQuota)")
+        lbl2.set_xalign(0)
+        lbl3 = Gtk.Label(label="• Kimlik Yalıtımı: Statik passwd/group/shadow/machine-id ve sahte hostname")
+        lbl3.set_xalign(0)
+        
+        info_box.pack_start(lbl1, False, False, 0)
+        info_box.pack_start(lbl2, False, False, 0)
+        info_box.pack_start(lbl3, False, False, 0)
         info_frame.add(info_box)
+        tab_general.pack_start(info_frame, False, False, 0)
+        notebook.append_page(tab_general, Gtk.Label(label="Genel Bakış"))
 
-        items = [
-            ("<b>Kişisel Gizlilik:</b>", "Ana ev dizininiz gizlenir, 'safebox' izole kimliği atanır."),
-            ("<b>Modern MATE Arayüzü:</b>", "Şık Yaru teması, Caja dosya yöneticisi ve Brisk menü."),
-            ("<b>Geçici RAM Alanı:</b>", "İndirilen tüm veriler oturum kapandığında tamamen silinir."),
-            ("<b>Donanım Hızlandırma:</b>", "NVIDIA/DRI desteği ile tam 3D grafik performansı."),
-            ("<b>Sıfır Kalıntı:</b>", "Sistem dosyaları salt okunur (read-only) bağlanır, sistem bozulamaz.")
-        ]
-        for t, d in items:
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            img = Gtk.Image.new_from_icon_name("emblem-default", Gtk.IconSize.MENU)
-            l = Gtk.Label()
-            l.set_markup(f"{t} {d}")
-            l.set_halign(Gtk.Align.START)
-            row.pack_start(img, False, False, 0)
-            row.pack_start(l, True, True, 0)
-            info_box.pack_start(row, False, False, 0)
-        tab1.pack_start(info_frame, True, True, 0)
-        notebook.append_page(tab1, Gtk.Label(label="Genel Bakış"))
+        # 2. Sekme: Kaynak ve Ekran
+        tab_res = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        tab_res.set_margin_top(12)
 
-        # SEKME 2: Donanım ve Kaynak Limitleri
-        tab2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        tab2.set_border_width(14)
+        # RAM Ayarı
+        ram_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        ram_lbl = Gtk.Label(label="Tahsis Edilecek RAM:")
+        ram_lbl.set_xalign(0)
+        self.ram_combo = Gtk.ComboBoxText()
+        for r in ["1 GB", "2 GB", "3 GB", "4 GB", "6 GB", "8 GB"]:
+            self.ram_combo.append_text(r)
+        self.ram_combo.set_active(3)
+        ram_box.pack_start(ram_lbl, False, False, 0)
+        ram_box.pack_start(self.ram_combo, True, True, 0)
+        tab_res.pack_start(ram_box, False, False, 0)
 
-        ram_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        lbl_ram = Gtk.Label()
-        lbl_ram.set_markup("<b>Maksimum RAM Sınırı (GB):</b>")
-        lbl_ram.set_halign(Gtk.Align.START)
-        ram_box.pack_start(lbl_ram, False, False, 0)
-        self.ram_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 1, 16, 1)
-        self.ram_scale.set_value(4)
-        self.ram_scale.set_digits(0)
-        ram_box.pack_start(self.ram_scale, False, False, 0)
-        tab2.pack_start(ram_box, False, False, 0)
+        # CPU Ayarı
+        cpu_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        cpu_lbl = Gtk.Label(label="Tahsis Edilecek CPU Çekirdeği:")
+        cpu_lbl.set_xalign(0)
+        self.cpu_combo = Gtk.ComboBoxText()
+        for c in ["1 Çekirdek", "2 Çekirdek", "4 Çekirdek", "6 Çekirdek", "8 Çekirdek"]:
+            self.cpu_combo.append_text(c)
+        self.cpu_combo.set_active(2)
+        cpu_box.pack_start(cpu_lbl, False, False, 0)
+        cpu_box.pack_start(self.cpu_combo, True, True, 0)
+        tab_res.pack_start(cpu_box, False, False, 0)
 
-        cpu_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        lbl_cpu = Gtk.Label()
-        lbl_cpu.set_markup("<b>Kullanılabilir Mantıksal Çekirdek (Thread):</b>")
-        lbl_cpu.set_halign(Gtk.Align.START)
-        cpu_box.pack_start(lbl_cpu, False, False, 0)
-        total_cpus = multiprocessing.cpu_count()
-        self.cpu_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 1, total_cpus, 1)
-        self.cpu_scale.set_value(min(6, total_cpus))
-        self.cpu_scale.set_digits(0)
-        cpu_box.pack_start(self.cpu_scale, False, False, 0)
-        tab2.pack_start(cpu_box, False, False, 0)
-
+        # Çözünürlük Ayarı
         res_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        lbl_res = Gtk.Label()
-        lbl_res.set_markup("<b>Ekran Çözünürlüğü:</b>")
+        res_lbl = Gtk.Label(label="Ekran Çözünürlüğü:")
+        res_lbl.set_xalign(0)
         self.res_combo = Gtk.ComboBoxText()
-        self.res_combo.append_text("1280x720 (HD)")
-        self.res_combo.append_text("1366x768 (Standart)")
-        self.res_combo.append_text("1600x900 (HD+)")
-        self.res_combo.append_text("1920x1010 (Tam Ekran Sığdır)")
-        self.res_combo.set_active(1)
-        res_box.pack_start(lbl_res, False, False, 0)
+        for res in ["1024x768", "1280x720", "1366x768", "1600x900", "1920x1080"]:
+            self.res_combo.append_text(res)
+        self.res_combo.set_active(2)
+        res_box.pack_start(res_lbl, False, False, 0)
         res_box.pack_start(self.res_combo, True, True, 0)
-        tab2.pack_start(res_box, False, False, 0)
-        notebook.append_page(tab2, Gtk.Label(label="Kaynak ve Ekran"))
+        tab_res.pack_start(res_box, False, False, 0)
 
-        # SEKME 3: Paylaşım ve İzinler
-        tab3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        tab3.set_border_width(14)
-        self.chk_share_folder = Gtk.CheckButton(label="Ortak Klasör Köprüsü (~/SafeBox-Paylasim)")
-        self.chk_share_folder.set_active(True)
-        tab3.pack_start(self.chk_share_folder, False, False, 0)
+        notebook.append_page(tab_res, Gtk.Label(label="Kaynak ve Ekran"))
 
-        self.chk_clipboard = Gtk.CheckButton(label="Çift Yönlü Pano Paylaşımı")
-        self.chk_clipboard.set_active(True)
-        tab3.pack_start(self.chk_clipboard, False, False, 0)
+        # 3. Sekme: İzinler ve İzolasyon
+        tab_perms = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        tab_perms.set_margin_top(12)
 
-        self.chk_audio = Gtk.CheckButton(label="Ses Desteği (PulseAudio / PipeWire)")
-        self.chk_audio.set_active(True)
-        tab3.pack_start(self.chk_audio, False, False, 0)
-
-        self.chk_net = Gtk.CheckButton(label="İnternet Erişimi")
+        self.chk_net = Gtk.CheckButton(label="İnternet ve Ağ Erişimi (Açıkken yalnızca kontrollü DNS kullanılır)")
         self.chk_net.set_active(True)
-        tab3.pack_start(self.chk_net, False, False, 0)
-        notebook.append_page(tab3, Gtk.Label(label="İzinler ve Paylaşım"))
+        self.chk_audio = Gtk.CheckButton(label="Ses Desteği (PulseAudio / PipeWire Soketi)")
+        self.chk_audio.set_active(True)
+        self.chk_share = Gtk.CheckButton(label="Paylaşılan Klasör (~/SafeBox-Paylasim Köprüsü)")
+        self.chk_share.set_active(True)
 
-        # SEKME 4: Canlı Güvenlik Günlüğü (Log)
-        tab_log = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        tab_log.set_border_width(12)
+        tab_perms.pack_start(self.chk_net, False, False, 0)
+        tab_perms.pack_start(self.chk_audio, False, False, 0)
+        tab_perms.pack_start(self.chk_share, False, False, 0)
+        notebook.append_page(tab_perms, Gtk.Label(label="İzinler ve İzolasyon"))
 
+        # 4. Sekme: Teşhis Konsolu (P0 Whitelist Korumalı)
+        tab_console = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        tab_console.set_margin_top(8)
+
+        self.console_view = Gtk.TextView()
+        self.console_view.set_editable(False)
+        self.console_view.set_monospace(True)
         scroll = Gtk.ScrolledWindow()
-        scroll.set_hexpand(True)
-        scroll.set_vexpand(True)
-        self.log_view = Gtk.TextView()
-        self.log_view.set_editable(False)
-        self.log_view.set_cursor_visible(False)
-        self.log_view.set_monospace(True)
-        self.log_view.set_left_margin(8)
-        self.log_view.set_right_margin(8)
-        self.log_buffer = self.log_view.get_buffer()
-        scroll.add(self.log_view)
-        tab_log.pack_start(scroll, True, True, 0)
+        scroll.add(self.console_view)
+        tab_console.pack_start(scroll, True, True, 0)
 
-        log_btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        btn_refresh_log = Gtk.Button(label="Yenile")
-        btn_refresh_log.connect("clicked", self.load_log)
-        btn_export_log = Gtk.Button(label="Dışa Aktar (.txt)")
-        btn_export_log.connect("clicked", self.export_log)
-        btn_clear_log = Gtk.Button(label="Günlüğü Temizle")
-        btn_clear_log.connect("clicked", self.clear_log)
+        # Komut Giriş Kutusu (Yalnızca Güvenli Komutlar)
+        cmd_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        cmd_lbl = Gtk.Label(label="Teşhis Komutu:")
+        self.cmd_entry = Gtk.Entry()
+        self.cmd_entry.set_placeholder_text("Kullanılabilir: doctor, status, sysinfo, purge, clear")
+        self.cmd_entry.connect("activate", self.on_run_command)
+        btn_run = Gtk.Button(label="Çalıştır")
+        btn_run.connect("clicked", self.on_run_command)
 
-        log_btn_box.pack_start(btn_refresh_log, False, False, 0)
-        log_btn_box.pack_start(btn_export_log, False, False, 0)
-        log_btn_box.pack_start(btn_clear_log, False, False, 0)
-        tab_log.pack_start(log_btn_box, False, False, 0)
+        cmd_box.pack_start(cmd_lbl, False, False, 0)
+        cmd_box.pack_start(self.cmd_entry, True, True, 0)
+        cmd_box.pack_start(btn_run, False, False, 0)
+        tab_console.pack_start(cmd_box, False, False, 0)
 
-        notebook.append_page(tab_log, Gtk.Label(label="Güvenlik Günlüğü"))
-        self.load_log()
+        notebook.append_page(tab_console, Gtk.Label(label="Konsol ve Günlük"))
 
         # Alt Butonlar
-        btn_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        btn_quit = Gtk.Button(label="Kapat")
-        btn_quit.connect("clicked", Gtk.main_quit)
-        btn_bar.pack_start(btn_quit, False, False, 0)
+        bottom_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        btn_close = Gtk.Button(label="Kapat")
+        btn_close.connect("clicked", Gtk.main_quit)
+        
+        self.btn_start = Gtk.Button(label="▶ Sanal Alanı Başlat")
+        self.btn_start.get_style_context().add_class("suggested-action")
+        self.btn_start.connect("clicked", self.on_start_sandbox)
 
-        self.btn_run = Gtk.Button()
-        b_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        p_icon = Gtk.Image.new_from_icon_name("media-playback-start", Gtk.IconSize.BUTTON)
-        p_lbl = Gtk.Label(label="Sanal Alanı Başlat")
-        b_content.pack_start(p_icon, False, False, 0)
-        b_content.pack_start(p_lbl, False, False, 0)
-        self.btn_run.add(b_content)
-        self.btn_run.get_style_context().add_class("suggested-action")
-        self.btn_run.connect("clicked", self.launch_sandbox)
-        btn_bar.pack_end(self.btn_run, False, False, 0)
-        vbox.pack_end(btn_bar, False, False, 0)
+        bottom_box.pack_start(btn_close, False, False, 0)
+        bottom_box.pack_end(self.btn_start, False, False, 0)
+        vbox.pack_start(bottom_box, False, False, 0)
 
-    def load_log(self, widget=None):
-        if os.path.exists(LOG_FILE):
-            with open(LOG_FILE, "r", encoding="utf-8") as f:
-                content = f.read()
-            self.log_buffer.set_text(content)
+        self.append_log(f"SafeBox Kontrol Merkezi Hazır (Sürüm: {VERSION}).\nGüvenli Teşhis Komutları: doctor, status, sysinfo, purge, clear\n")
+
+    def append_log(self, text):
+        buf = self.console_view.get_buffer()
+        buf.insert(buf.get_end_iter(), text + "\n")
+        mark = buf.create_mark(None, buf.get_end_iter(), False)
+        self.console_view.scroll_to_mark(mark, 0.05, True, 0.0, 1.0)
+
+    def on_run_command(self, widget):
+        cmd = self.cmd_entry.get_text().strip().lower()
+        self.cmd_entry.set_text("")
+        if not cmd:
+            return
+
+        self.append_log(f"> {cmd}")
+        
+        # P0 FIX: Whitelist Doğrulaması (Asla shell=True çalıştırma)
+        if cmd == "clear":
+            self.console_view.get_buffer().set_text("")
+        elif cmd == "status":
+            self.append_log("SafeBox Durumu: Hazır\nSandbox Altyapısı: Bubblewrap + Xephyr + cgroup v2")
+        elif cmd == "sysinfo":
+            self.append_log(f"SafeBox Sürüm: {VERSION}\nHost Çekirdek: {os.uname().release}\nSandbox Modu: Hardened Whitelist Isolation")
+        elif cmd == "purge":
+            os.system("rm -rf ~/.local/share/safebox/mock_*")
+            self.append_log("Önbellek ve sanal mock dosyaları temizlendi.")
+        elif cmd == "doctor":
+            self.run_doctor()
         else:
-            self.log_buffer.set_text("[BILGI] Henuz bir guvenlik gunlugu olusmadi.\n")
+            self.append_log(f"Yetkisiz veya geçersiz komut: '{cmd}'\nİzin verilen komutlar: doctor, status, sysinfo, purge, clear")
 
-    def export_log(self, widget=None):
-        dialog = Gtk.FileChooserDialog(
-            title="Güvenlik Günlüğünü Kaydet",
-            parent=self,
-            action=Gtk.FileChooserAction.SAVE
-        )
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_SAVE, Gtk.ResponseType.OK
-        )
-        dialog.set_current_name("safebox_guvenlik_gunlugu.txt")
-        dialog.set_do_overwrite_confirmation(True)
+    def run_doctor(self):
+        self.append_log("=== SafeBox Teşhis ve Doğrulama (Doctor) ===")
+        checks = [
+            ("Bubblewrap (bwrap) İzolasyon Motoru", "which bwrap"),
+            ("Xephyr Sanal X11 Sunucusu", "which Xephyr"),
+            ("XFWM4 Pencere Yöneticisi", "which xfwm4"),
+            ("PCManFM Masaüstü Motoru", "which pcmanfm"),
+            ("Tint2 Görev Çubuğu Paneli", "which tint2"),
+            ("Rofi Başlatıcı", "which rofi"),
+        ]
+        for name, sh_cmd in checks:
+            ret = subprocess.run(sh_cmd.split(), capture_output=True)
+            status = "PASS" if ret.returncode == 0 else "FAIL"
+            self.append_log(f"[{status}] {name}")
+        self.append_log("============================================")
 
-        if dialog.run() == Gtk.ResponseType.OK:
-            target_path = dialog.get_filename()
-            start_iter = self.log_buffer.get_start_iter()
-            end_iter = self.log_buffer.get_end_iter()
-            text = self.log_buffer.get_text(start_iter, end_iter, True)
-            with open(target_path, "w", encoding="utf-8") as f:
-                f.write(text)
-        dialog.destroy()
-
-    def clear_log(self, widget=None):
-        if os.path.exists(LOG_FILE):
-            with open(LOG_FILE, "w", encoding="utf-8") as f:
-                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Guvenlik gunlugu sifirlandi.\n")
-        self.load_log()
-
-    def launch_sandbox(self, widget):
-        self.hide()
-        ram = int(self.ram_scale.get_value())
-        cpus = int(self.cpu_scale.get_value())
-        res = self.res_combo.get_active_text().split()[0]
-        share = "1" if self.chk_share_folder.get_active() else "0"
-        clip = "1" if self.chk_clipboard.get_active() else "0"
-        audio = "1" if self.chk_audio.get_active() else "0"
+    def on_start_sandbox(self, widget):
+        ram = self.ram_combo.get_active_text().split()[0]
+        cpu = self.cpu_combo.get_active_text().split()[0]
+        res = self.res_combo.get_active_text()
         net = "1" if self.chk_net.get_active() else "0"
+        audio = "1" if self.chk_audio.get_active() else "0"
+        share = "1" if self.chk_share.get_active() else "0"
 
-        cmd = ["/usr/bin/safebox-core", str(ram), str(cpus), res, share, clip, audio, net]
-        threading.Thread(target=self._run_backend, args=(cmd,), daemon=True).start()
+        self.btn_start.set_sensitive(False)
+        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}...")
 
-    def _run_backend(self, cmd):
-        subprocess.run(cmd)
-        GLib.idle_add(Gtk.main_quit)
+        def run_thread():
+            engine_path = "/usr/bin/safebox-core"
+            if not os.path.exists(engine_path):
+                engine_path = os.path.expanduser("~/safebox/usr/bin/safebox-core")
+            
+            cmd = [engine_path, ram, cpu, res, share, "1", audio, net]
+            proc = subprocess.run(cmd)
+            GLib.idle_add(self.on_sandbox_finished, proc.returncode)
 
-win = SafeBoxApp()
-win.connect("destroy", Gtk.main_quit)
-win.show_all()
-Gtk.main()
+        threading.Thread(target=run_thread, daemon=True).start()
+
+    def on_sandbox_finished(self, returncode):
+        self.btn_start.set_sensitive(True)
+        if returncode == 0:
+            self.append_log("[KAPANDI] Sanal alan güvenle sonlandırıldı.")
+        else:
+            self.append_log(f"[HATA] Sanal alan hata kodu ile sonlandı: {returncode}")
+
+def main():
+    app = SafeBoxGUI()
+    app.connect("destroy", Gtk.main_quit)
+    app.show_all()
+    Gtk.main()
+
+if __name__ == "__main__":
+    main()

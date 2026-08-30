@@ -1,5 +1,10 @@
-safebox (1.2.1-1~ppa1~noble1) noble; urgency=medium
+safebox (1.6.9-1~ppa1~noble1) noble; urgency=medium
 
-  * v1.2.1: Gelişmiş hata yakalama, otomatik Xephyr soket denetimi, trap temizlik mekanizması ve güvenlik iyileştirmeleri.
+  * P0: Geliştirici konsolu host komut çalıştırma açığı kapatıldı, katı whitelist getirildi.
+  * P1: Linux cgroup v2 (MemoryMax & CPUQuota) gerçek bellek ve CPU sınırları entegre edildi.
+  * P1: /dev whitelist uygulandı; yalnızca kontrollü aygıtlar sağlandı.
+  * P1: Rastgele machine-id ve izole os-release dosyaları enjekte edildi.
+  * P1: || true kaldırıldı, Xephyr zaman aşımı ve süreç sağlık denetimi eklendi.
+  * P2 & P3: Tüm sürümler 1.6.9 olarak eşitlendi.
 
- -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Sat, 29 Aug 2026 14:50:00 +0300
+ -- Winexe <winexee@gmail.com>  Sun, 30 Aug 2026 21:00:00 +0300

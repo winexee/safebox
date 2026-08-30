@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# SafeBox Hardened Virtual Hardware & Namespace Engine (v1.6.5)
-set -e
+# SafeBox Military-Grade Hardened & cgroup-Enforced Engine (v1.6.9)
+set -euo pipefail
 
 RAM_GB="${1:-4}"
 CPU_CORES="${2:-4}"
@@ -13,13 +13,24 @@ NET="${7:-1}"
 LOG_DIR="${HOME}/.local/share/safebox"
 PROC_MOCK_DIR="${LOG_DIR}/mock_proc"
 SYS_MOCK_DIR="${LOG_DIR}/mock_sys"
+ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
-mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu"
+mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu" "$ETC_MOCK_DIR"
 
-echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Sanal Makine Başlatılıyor ===" > "$ENGINE_LOG"
-echo "İzolasyon: ${CPU_CORES} Çekirdek, ${RAM_GB} GB RAM" >> "$ENGINE_LOG"
+echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Sandbox v1.6.9 Başlatılıyor ===" > "$ENGINE_LOG"
+echo "Yapılandırma: RAM=${RAM_GB}GB (cgroup v2), CPU=${CPU_CORES} Core, Çözünürlük=${RESOLUTION}" >> "$ENGINE_LOG"
 
-# 1. Sanal Bellek (/proc/meminfo)
+# 1. Benzersiz Rastgele Machine-ID ve OS-Release Üretimi
+dbus-uuidgen > "${ETC_MOCK_DIR}/machine-id"
+cat << 'OS_EOF' > "${ETC_MOCK_DIR}/os-release"
+NAME="SafeBox OS"
+VERSION="1.6.9 (Hardened Sandbox)"
+ID=safebox
+ID_LIKE=debian
+PRETTY_NAME="SafeBox Hardened Workspace"
+OS_EOF
+
+# 2. Sanal Bellek (/proc/meminfo)
 TOTAL_KB=$((RAM_GB * 1024 * 1024))
 FREE_KB=$((TOTAL_KB * 80 / 100))
 AVAIL_KB=$((TOTAL_KB * 75 / 100))
@@ -37,7 +48,7 @@ SwapTotal:             0 kB
 SwapFree:              0 kB
 MEM_EOF
 
-# 2. Sanal CPU (/proc/cpuinfo & /proc/stat)
+# 3. Sanal CPU (/proc/cpuinfo & /proc/stat)
 rm -f "${PROC_MOCK_DIR}/cpuinfo" "${PROC_MOCK_DIR}/stat"
 echo "cpu  2000 0 2000 20000 0 0 0 0 0 0" > "${PROC_MOCK_DIR}/stat"
 
@@ -46,7 +57,7 @@ for ((i=0; i<CPU_CORES; i++)); do
 processor	: $i
 vendor_id	: GenuineIntel
 cpu family	: 6
-model_name	: SafeBox Virtual Processor (vCPU)
+model_name	: SafeBox Isolated Virtual Core
 stepping	: 1
 cpu MHz		: 2500.000
 cache size	: 18432 KB
@@ -60,13 +71,12 @@ CPU_EOF
     echo "cpu$i 1000 0 1000 10000 0 0 0 0 0 0" >> "${PROC_MOCK_DIR}/stat"
 done
 
-# Sanal Sys CPU Online
 MAX_CORE=$((CPU_CORES - 1))
 if [ "$MAX_CORE" -lt 0 ]; then MAX_CORE=0; fi
 echo "0-${MAX_CORE}" > "${SYS_MOCK_DIR}/devices/system/cpu/online"
 CPU_AFFINITY="0-${MAX_CORE}"
 
-# 3. Sanal Display Bul
+# 4. Boş Display Bul
 TARGET_DISP=""
 for d in $(seq 10 99); do
     if [ ! -e "/tmp/.X11-unix/X$d" ] && [ ! -e "/tmp/.X$d-lock" ]; then
@@ -76,26 +86,36 @@ for d in $(seq 10 99); do
 done
 
 if [ -z "$TARGET_DISP" ]; then
-    echo "[HATA] Boş ekran bulunamadı!" >> "$ENGINE_LOG"
+    echo "[HATA] Boş bir sanal ekran numarası bulunamadı!" >> "$ENGINE_LOG"
     exit 101
 fi
 
-Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -ac -title "SafeBox Secure Desktop ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
+# 5. Xephyr Ekranını Başlat ve Sağlığını Doğrula
+Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -title "SafeBox Secure Workspace ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
 cleanup() {
-    echo "[BİLGİ] Oturum kapatılıyor..." >> "$ENGINE_LOG"
+    echo "[BİLGİ] Oturum sonlandırılıyor..." >> "$ENGINE_LOG"
     kill -9 "$XEPHYR_PID" 2>/dev/null || true
-    echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Sanal Makine Kapatıldı ===" >> "$ENGINE_LOG"
+    echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Sanal Alan Kapatıldı ===" >> "$ENGINE_LOG"
 }
 trap cleanup EXIT INT TERM
 
+XEPHYR_READY=0
 for i in {1..25}; do
-    if [ -e "/tmp/.X11-unix/X${TARGET_DISP#:}" ]; then break; fi
+    if [ -e "/tmp/.X11-unix/X${TARGET_DISP#:}" ]; then
+        XEPHYR_READY=1
+        break
+    fi
     sleep 0.2
 done
 
-# 4. Bubblewrap İzolasyon Parametreleri
+if [ "$XEPHYR_READY" -eq 0 ]; then
+    echo "[HATA] Xephyr X11 sunucusu belirlenen sürede ayağa kalkamadı!" >> "$ENGINE_LOG"
+    exit 102
+fi
+
+# 6. Bubblewrap Katı İzolasyon Parametreleri (Minimum Cihaz / Dev Whitelist)
 BWRAP_ARGS=(
     --ro-bind /usr /usr
     --ro-bind /lib /lib
@@ -103,6 +123,8 @@ BWRAP_ARGS=(
     --ro-bind /bin /bin
     --ro-bind /sbin /sbin
     --ro-bind /etc /etc
+    --ro-bind "${ETC_MOCK_DIR}/machine-id" /etc/machine-id
+    --ro-bind "${ETC_MOCK_DIR}/os-release" /etc/os-release
     --ro-bind /usr/share/safebox/guest-etc/passwd /etc/passwd
     --ro-bind /usr/share/safebox/guest-etc/group /etc/group
     --ro-bind /usr/share/safebox/guest-etc/shadow /etc/shadow
@@ -110,13 +132,17 @@ BWRAP_ARGS=(
     --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
     --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
     --hostname safebox-sandbox
-    --dev /dev
+    --dev-bind /dev/null /dev/null
+    --dev-bind /dev/zero /dev/zero
+    --dev-bind /dev/full /dev/full
+    --dev-bind /dev/random /dev/random
+    --dev-bind /dev/urandom /dev/urandom
+    --dev-bind /dev/tty /dev/tty
     --dev-bind /dev/shm /dev/shm
     --proc /proc
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
     --ro-bind "${PROC_MOCK_DIR}/cpuinfo" /proc/cpuinfo
     --ro-bind "${PROC_MOCK_DIR}/stat" /proc/stat
-    # Donanım Sızıntılarını Kökten Engelleyen /sys Maskelemesi
     --tmpfs /sys
     --ro-bind "${SYS_MOCK_DIR}/devices/system/cpu/online" /sys/devices/system/cpu/online
     --tmpfs /tmp
@@ -151,7 +177,7 @@ if [ "$NET" = "1" ]; then
     fi
 fi
 
-# GPU Düğümleri
+# Kontrollü GPU Cihazları
 if [ -d /dev/dri ]; then BWRAP_ARGS+=(--dev-bind /dev/dri /dev/dri); fi
 for nv in /dev/nvidia*; do
     if [ -e "$nv" ]; then BWRAP_ARGS+=(--dev-bind "$nv" "$nv"); fi
@@ -175,5 +201,17 @@ fi
 # X11 Socket
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
 
-# 5. taskset ile Seçilen Çekirdeklere Bağlayarak Başlat
-taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || true
+# 7. cgroup v2 Gerçek Donanım Sınırlandırması ile Çalıştır
+CPU_QUOTA_VAL=$((CPU_CORES * 100))
+SYSTEMD_ARGS=(
+    --user
+    --scope
+    -p "MemoryMax=${RAM_GB}G"
+    -p "CPUQuota=${CPU_QUOTA_VAL}%"
+)
+
+if which systemd-run >/dev/null 2>&1; then
+    taskset -c "$CPU_AFFINITY" systemd-run "${SYSTEMD_ARGS[@]}" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1
+else
+    taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1
+fi

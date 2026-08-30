@@ -1,0 +1,2 @@
+w#!/bin/bash
+exec /usr/bin/python3 /usr/share/safebox/safebox_gui.py "$@"

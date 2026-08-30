@@ -1,11 +1,13 @@
 Package: safebox
-Version: 1.2.1-1~ppa1~noble1
+Version: 1.6.9-1~ppa1~noble1
 Architecture: all
-Maintainer: Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>
+Maintainer: Winexe <winexee@gmail.com>
 Installed-Size: 38
-Depends: bubblewrap, xfce4, xfce4-session, xserver-xephyr, dbus-x11, python3, python3-gi, gir1.2-gtk-3.0, libnotify-bin
+Depends: bubblewrap, xserver-xephyr, dbus-x11, python3, python3-gi, gir1.2-gtk-3.0, xfwm4, xfdesktop4, thunar, mousepad, xfce4-terminal, mate-system-monitor, tint2, rofi, epiphany-browser, feh, hsetroot, yaru-theme-icon, yaru-theme-gtk
 Section: utils
 Priority: optional
-Homepage: https://launchpad.net/~winexe
-Description: Izole ve guvenli sanal alan ortami
- SafeBox, bubblewrap altyapisi ile guvenli ve izole bir masaustu sunar.
+Homepage: https://github.com/winexee/safebox
+Description: Guvenli ve tam izole sanal masaustu ortami
+ SafeBox; Bubblewrap, XFCE4 ve Xephyr altyapisini birlestirerek
+ tam donanim izolasyonlu (CPU/RAM/Hostname/Passwd) ve izole
+ bir masaustu ortami sunar.
