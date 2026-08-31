@@ -207,7 +207,9 @@ BWRAP_ARGS=(
     --ro-bind /sbin /sbin
     --ro-bind /etc /etc
     --ro-bind "${ETC_MOCK_DIR}/machine-id" /etc/machine-id
-    --ro-bind "${ETC_MOCK_DIR}/os-release" /etc/os-release
+    # Ubuntu'da /etc/os-release -> /usr/lib/os-release olabilir.
+    # Mock kimliği gerçek dosyanın hedefi üzerine uygulanır.
+    --ro-bind "${ETC_MOCK_DIR}/os-release" /usr/lib/os-release
     --ro-bind /usr/share/safebox/guest-etc/passwd /etc/passwd
     --ro-bind /usr/share/safebox/guest-etc/group /etc/group
     --ro-bind /usr/share/safebox/guest-etc/shadow /etc/shadow
