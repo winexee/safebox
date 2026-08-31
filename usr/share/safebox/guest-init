@@ -81,4 +81,28 @@ chmod +x "$HOME/Desktop/"*.desktop "$HOME/Masaüstü/"*.desktop 2>/dev/null || t
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 
-exec dbus-run-session -- cinnamon --sm-disable
+exec dbus-run-session -- bash -c '
+    # SafeBox guest paneli için host/default applet listesini ez.
+    # printers ve network appletleri guest içinde bulunmayan servisler
+    # istediği için bilinçli olarak devre dışı bırakılır.
+
+    gsettings set org.cinnamon enabled-applets "[
+      '\''panel1:left:0:menu@cinnamon.org:0'\'',
+      '\''panel1:left:1:separator@cinnamon.org:1'\'',
+      '\''panel1:left:2:grouped-window-list@cinnamon.org:2'\'',
+      '\''panel1:right:0:systray@cinnamon.org:3'\'',
+      '\''panel1:right:1:xapp-status@cinnamon.org:4'\'',
+      '\''panel1:right:2:notifications@cinnamon.org:5'\'',
+      '\''panel1:right:3:removable-drives@cinnamon.org:6'\'',
+      '\''panel1:right:4:keyboard@cinnamon.org:7'\'',
+      '\''panel1:right:5:favorites@cinnamon.org:8'\'',
+      '\''panel1:right:6:sound@cinnamon.org:9'\'',
+      '\''panel1:right:7:power@cinnamon.org:10'\'',
+      '\''panel1:right:8:calendar@cinnamon.org:11'\'',
+      '\''panel1:right:9:cornerbar@cinnamon.org:12'\''
+    ]"
+
+    echo "[OK] SafeBox Cinnamon panel ayarları uygulandı."
+
+    exec cinnamon --sm-disable
+'

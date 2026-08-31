@@ -325,6 +325,33 @@ class SafeBoxGUI(Gtk.Window):
 
         return True
 
+    def launch_vnc_viewer(self, display, display_num):
+        try:
+            vnc_display = f"127.0.0.1:{display_num}"
+
+            self.append_log(
+                f"[BAŞLATILIYOR] Görüntüleyici: {vnc_display}"
+            )
+
+            self.viewer_proc = subprocess.Popen([
+                "gvncviewer",
+                vnc_display,
+            ])
+
+            self.viewer_started = True
+
+            self.append_log(
+                f"[OK] Cinnamon görüntüsü açıldı: {display}"
+            )
+
+        except Exception as e:
+            self.viewer_started = False
+            self.append_log(
+                f"[HATA] Görüntüleyici açılamadı: {e}"
+            )
+
+        return False
+
     def check_sandbox_process(self):
         proc = getattr(self, "sandbox_proc", None)
 
