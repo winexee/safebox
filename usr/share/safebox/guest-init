@@ -8,7 +8,7 @@ export LOGNAME=safebox
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_CACHE_HOME="$HOME/.cache"
 export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_DATA_DIRS="/opt:/usr/local/share:/usr/share"
+export XDG_DATA_DIRS="/opt/share:/usr/local/share"
 
 export XDG_SESSION_TYPE=x11
 export XDG_CURRENT_DESKTOP=X-Cinnamon
@@ -102,12 +102,24 @@ exec dbus-run-session -- bash -c '
       '\''panel1:right:9:cornerbar@cinnamon.org:12'\''
     ]"
 
-    # Host duvar kağıdını kullanma; SafeBox için düz koyu arka plan.
-    gsettings set org.cinnamon.desktop.background picture-uri "" 2>/dev/null || true
-    gsettings set org.cinnamon.desktop.background picture-uri-dark "" 2>/dev/null || true
-    gsettings set org.cinnamon.desktop.background primary-color "#202020" 2>/dev/null || true
-    gsettings set org.cinnamon.desktop.background secondary-color "#202020" 2>/dev/null || true
-    gsettings set org.cinnamon.desktop.background color-shading-type "solid" 2>/dev/null || true
+
+    # SafeBox guest arka planı
+    BG="/usr/share/backgrounds/gnome/pixels-d.jpg"
+
+    if [ ! -f "$BG" ]; then
+        BG="/usr/share/backgrounds/gnome/adwaita-d.jpg"
+    fi
+
+    if [ -f "$BG" ]; then
+        BG_URI="file://${BG}"
+        gsettings set org.cinnamon.desktop.background picture-uri "$BG_URI" || true
+        gsettings set org.cinnamon.desktop.background picture-uri-dark "$BG_URI" || true
+        gsettings set org.cinnamon.desktop.background picture-options "zoom" || true
+        echo "[OK] SafeBox arka planı: $BG"
+    else
+        echo "[UYARI] Guest arka plan dosyası bulunamadı."
+    fi
+
 
     echo "[OK] SafeBox Cinnamon panel ayarları uygulandı."
 

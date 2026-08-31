@@ -195,20 +195,54 @@ else
 fi
 
 # 5. HATA DÜZELTMESİ: --dev /dev Geri Getirildi (Terminal PTS çökmelerini önler)
+ROOTFS="/var/lib/safebox/rootfs"
+
+if [ ! -x "${ROOTFS}/bin/bash" ]; then
+    echo "[HATA] SafeBox rootfs bulunamadı veya eksik: ${ROOTFS}" >> "$ENGINE_LOG"
+    exit 105
+fi
+
 BWRAP_ARGS=(
     --unshare-all
     --uid 1000
     --gid 1000
     --hostname safebox-sandbox
-    --ro-bind /usr /usr
-    --ro-bind /lib /lib
-    --ro-bind /lib64 /lib64
-    --ro-bind /bin /bin
-    --ro-bind /sbin /sbin
-    --ro-bind /etc /etc
+
+    # Ayrı guest rootfs
+    --bind "$ROOTFS" /
+
+    # Guest pseudo filesystems
+    --dev /dev
+    --proc /proc
+    --tmpfs /sys
+    --tmpfs /tmp
+    --tmpfs /run
+    --tmpfs /var
+
+    # Guest runtime
+    --dir /run/user/1000
+    --setenv XDG_RUNTIME_DIR /run/user/1000
+
+    # Guest home
+    --tmpfs /home
+    --dir /home/safebox
+    --dir /home/safebox/.config
+    --dir /home/safebox/.cache
+    --dir /home/safebox/.local
+    --dir /home/safebox/.local/share
+    --dir /home/safebox/.local/bin
+
+    --setenv HOME /home/safebox
+    --setenv USER safebox
+    --setenv LOGNAME safebox
+    --setenv DISPLAY "$TARGET_DISP"
+    --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
+
+    # Uygulama menüsü için yalnızca SafeBox veri kökü
+    --setenv XDG_DATA_DIRS "/opt/share:/usr/local/share"
+
+    # Kimlik izolasyonu
     --ro-bind "${ETC_MOCK_DIR}/machine-id" /etc/machine-id
-    # Ubuntu'da /etc/os-release -> /usr/lib/os-release olabilir.
-    # Mock kimliği gerçek dosyanın hedefi üzerine uygulanır.
     --ro-bind "${ETC_MOCK_DIR}/os-release" /usr/lib/os-release
     --ro-bind /usr/share/safebox/guest-etc/passwd /etc/passwd
     --ro-bind /usr/share/safebox/guest-etc/group /etc/group
@@ -216,34 +250,60 @@ BWRAP_ARGS=(
     --ro-bind /usr/share/safebox/guest-etc/nsswitch.conf /etc/nsswitch.conf
     --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
     --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
+
+    # SafeBox runtime
+    --ro-bind /usr/share/safebox/guest-init /usr/share/safebox/guest-init
+    --ro-bind /usr/share/safebox/guest-apps /usr/share/safebox/guest-apps
     --ro-bind /usr/share/safebox/guest-config /usr/share/safebox/guest-config
-    --dev /dev
-    --proc /proc
+    --ro-bind /usr/share/safebox/safebox-guest-blocker /usr/share/safebox/safebox-guest-blocker
+    --ro-bind /usr/share/safebox/xorg /usr/share/safebox/xorg
+
+    # Mock hardware
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
     --ro-bind "${PROC_MOCK_DIR}/cpuinfo" /proc/cpuinfo
     --ro-bind "${PROC_MOCK_DIR}/stat" /proc/stat
-    --tmpfs /sys
+
+    --dir /sys/devices
+    --dir /sys/devices/system
+    --dir /sys/devices/system/cpu
     --ro-bind "${SYS_MOCK_DIR}/devices/system/cpu/online" /sys/devices/system/cpu/online
-    --tmpfs /tmp
-    --tmpfs /var
-    --tmpfs /run
-    --dir /run/user/1000
-    --setenv XDG_RUNTIME_DIR /run/user/1000
-    --tmpfs /home
-    --dir /home/safebox
-    --dir /home/safebox/.local/bin
-    --setenv HOME /home/safebox
-    --setenv USER safebox
-    --setenv LOGNAME safebox
-    --setenv DISPLAY "$TARGET_DISP"
-    --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
---setenv XDG_DATA_DIRS "/opt:/usr/local/share:/usr/share"
-    # Sistem /usr/share/applications dizini görünür kalmalı:
-    # Cinnamon session gerekli .desktop bileşenlerini buradan bulur.
-    # SafeBox'a ait özel launcher'lar ayrı bir XDG data köküne bind edilir.
+
+    # Yalnızca seçilmiş SafeBox desktop launcher'ları
     --dir /opt
-    --ro-bind /usr/share/safebox/guest-apps /opt/applications
-    --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
+    --dir /opt/share
+    --dir /opt/share/applications
+
+    # Guest filesystem'deki bütün uygulama listesini gizle.
+    --tmpfs /usr/share/applications
+
+    --ro-bind /usr/share/safebox/guest-apps/browser.desktop \
+        /usr/share/applications/browser.desktop
+    --ro-bind /usr/share/safebox/guest-apps/editor.desktop \
+        /usr/share/applications/editor.desktop
+    --ro-bind /usr/share/safebox/guest-apps/home.desktop \
+        /usr/share/applications/home.desktop
+    --ro-bind /usr/share/safebox/guest-apps/share.desktop \
+        /usr/share/applications/share.desktop
+    --ro-bind /usr/share/safebox/guest-apps/terminal.desktop \
+        /usr/share/applications/terminal.desktop
+
+    --ro-bind /usr/share/safebox/browser-run         /usr/share/safebox/browser-run
+    --ro-bind /usr/share/safebox/rofi         /usr/share/safebox/rofi
+    --ro-bind /usr/share/safebox/guest-apps/monitor.desktop \
+        /usr/share/applications/monitor.desktop
+    --ro-bind /usr/share/safebox/guest-apps/menu.desktop \
+        /usr/share/applications/menu.desktop
+
+    --ro-bind /usr/share/safebox/guest-apps \
+        /opt/share/applications
+
+    --ro-bind /usr/share/safebox/safebox-guest-blocker \
+        /home/safebox/.local/bin/safebox
+
+    # X11
+    --bind "/tmp/.X11-unix/X${TARGET_DISP#:}" \
+        "/tmp/.X11-unix/X${TARGET_DISP#:}"
+
     --die-with-parent
     --new-session
 )

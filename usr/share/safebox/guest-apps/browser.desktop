@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
 Name=Web Tarayıcısı
-Exec=/usr/share/safebox/browser-run %u
+Exec=epiphany-browser %u
 Icon=web-browser
 Categories=Network;WebBrowser;

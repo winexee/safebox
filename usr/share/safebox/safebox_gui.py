@@ -302,6 +302,7 @@ class SafeBoxGUI(Gtk.Window):
                             "-shared",
                             "-noxdamage",
                             "-noshm",
+                            "-input", "KMBC",
                         ], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL)
 
