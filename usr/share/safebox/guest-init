@@ -8,22 +8,31 @@ export LOGNAME=safebox
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_CACHE_HOME="$HOME/.cache"
 export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_DATA_DIRS="/usr/share:/usr/local/share"
+export XDG_DATA_DIRS="/opt:/usr/local/share:/usr/share"
 
 export XDG_SESSION_TYPE=x11
 export XDG_CURRENT_DESKTOP=X-Cinnamon
 export XDG_SESSION_DESKTOP=cinnamon
 export DESKTOP_SESSION=cinnamon
 
+# Host Cinnamon/ICE oturum bilgisini guest'e taşımama.
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+
+
+# Cinnamon-session için private ICE authority.
+export ICEAUTHORITY="$HOME/.ICEauthority"
+touch "$ICEAUTHORITY"
+chmod 600 "$ICEAUTHORITY"
+
+
 export GIO_USE_VFS=local
 export GVFS_DISABLE_FUSE=1
-export GTK_THEME="Yaru-sage-dark"
 
-# X11 için gerekli dizin
-mkdir -p /tmp/.ICE-unix
-chmod 1777 /tmp/.ICE-unix
+# Önce stabil Cinnamon varsayılanlarıyla başlayalım.
+# Tema özelleştirmesini session çalıştıktan sonra ayrı ele alacağız.
+export GTK_THEME="Yaru-dark"
 
-# Guest dizinleri
 mkdir -p \
     "$HOME/Desktop" \
     "$HOME/Masaüstü" \
@@ -39,41 +48,37 @@ mkdir -p \
     "$HOME/.cache" \
     "$HOME/.local/share"
 
-# GTK 3
 cat > "$HOME/.config/gtk-3.0/settings.ini" <<'GTK3_EOF'
 [Settings]
-gtk-theme-name=Yaru-sage-dark
-gtk-icon-theme-name=Yaru-sage-dark
+gtk-theme-name=Yaru-dark
+gtk-icon-theme-name=Yaru
 gtk-font-name=Ubuntu 10
 gtk-application-prefer-dark-theme=1
 GTK3_EOF
 
-# GTK 4
 cat > "$HOME/.config/gtk-4.0/settings.ini" <<'GTK4_EOF'
 [Settings]
-gtk-theme-name=Yaru-sage-dark
-gtk-icon-theme-name=Yaru-sage-dark
+gtk-theme-name=Yaru-dark
+gtk-icon-theme-name=Yaru
 gtk-font-name=Ubuntu 10
 gtk-application-prefer-dark-theme=1
 GTK4_EOF
 
-# Uygulama kısayolları
 rm -f "$HOME/Desktop/"*.desktop "$HOME/Masaüstü/"*.desktop 2>/dev/null || true
 
 for app in browser home share terminal editor monitor; do
-    if [ -f "/usr/share/safebox/guest-apps/${app}.desktop" ]; then
-        cp "/usr/share/safebox/guest-apps/${app}.desktop" "$HOME/Desktop/" 2>/dev/null || true
-        cp "/usr/share/safebox/guest-apps/${app}.desktop" "$HOME/Masaüstü/" 2>/dev/null || true
+    if [ -f "/opt/applications/${app}.desktop" ]; then
+        cp "/opt/applications/${app}.desktop" "$HOME/Desktop/" 2>/dev/null || true
+        cp "/opt/applications/${app}.desktop" "$HOME/Masaüstü/" 2>/dev/null || true
     fi
 done
 
 chmod +x "$HOME/Desktop/"*.desktop "$HOME/Masaüstü/"*.desktop 2>/dev/null || true
 
-# ---------------------------------------------------------------
-# ÖNEMLİ:
-# Cinnamon başlamadan önce nemo-desktop,
-# cinnamon-settings-daemon veya gsettings çalıştırmıyoruz.
-# Cinnamon kendi monitor/panel initialization'ını önce yapsın.
-# ---------------------------------------------------------------
+# Cinnamon'u doğrudan özel session D-Bus altında başlat.
+# cinnamon-session kullanılmaz; test edilen rootless-Xorg yoludur.
 
-exec cinnamon --sm-disable
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+
+exec dbus-run-session -- cinnamon --sm-disable

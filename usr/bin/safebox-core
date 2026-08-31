@@ -2,6 +2,13 @@
 # SafeBox Enterprise Hardened Engine (v1.7.5)
 set -euo pipefail
 
+# XDG runtime dizini her çağrıda mevcut olmayabilir.
+# Özellikle doğrudan çalıştırma ve minimal session ortamlarında güvenli varsayılan kullan.
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+    XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    export XDG_RUNTIME_DIR
+fi
+
 RAM_GB="${1:-4}"
 CPU_CORES="${2:-4}"
 RESOLUTION="${3:-1366x768}"
@@ -11,6 +18,7 @@ AUDIO="${6:-1}"
 NET="${7:-1}"
 
 LOG_DIR="${HOME}/.local/share/safebox"
+DISPLAY_FILE="${LOG_DIR}/display"
 PROC_MOCK_DIR="${LOG_DIR}/mock_proc"
 SYS_MOCK_DIR="${LOG_DIR}/mock_sys"
 ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
@@ -85,7 +93,12 @@ if [ "$MAX_CORE" -lt 0 ]; then MAX_CORE=0; fi
 echo "0-${MAX_CORE}" > "${SYS_MOCK_DIR}/devices/system/cpu/online"
 CPU_AFFINITY="0-${MAX_CORE}"
 
-# 4. Display Ekranı Bul
+# 4. Rootless Xorg sanal ekranı
+#
+# Xephyr, Cinnamon'un monitor/RandR altyapısıyla uyumlu çalışmadığı
+# için kullanılmaz. Aynı kullanıcı altında rootless Xorg + dummy
+# driver ile gerçek bir RandR monitor nesnesi oluşturulur.
+
 TARGET_DISP=""
 for d in $(seq 10 99); do
     if [ ! -e "/tmp/.X11-unix/X$d" ] && [ ! -e "/tmp/.X$d-lock" ]; then
@@ -99,42 +112,86 @@ if [ -z "$TARGET_DISP" ]; then
     exit 101
 fi
 
-Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -title "SafeBox Secure Workspace ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
-XEPHYR_PID=$!
+XORG_CONFIG="/usr/share/safebox/xorg/safebox-dummy.conf"
+
+if [ ! -f "$XORG_CONFIG" ]; then
+    echo "[HATA] Xorg yapılandırması bulunamadı: $XORG_CONFIG" >> "$ENGINE_LOG"
+    exit 102
+fi
+
+/usr/lib/xorg/Xorg "$TARGET_DISP" \
+    -config "$XORG_CONFIG" \
+    -noreset \
+    -nolisten tcp \
+    -ac \
+    -keeptty >> "$ENGINE_LOG" 2>&1 &
+
+XORG_PID=$!
 
 cleanup() {
     echo "[BİLGİ] Oturum kapatılıyor..." >> "$ENGINE_LOG"
-    kill -9 "$XEPHYR_PID" 2>/dev/null || true
+    kill "$XORG_PID" 2>/dev/null || true
+    wait "$XORG_PID" 2>/dev/null || true
+    rm -f "$DISPLAY_FILE"
     echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Oturum Kapatıldı ===" >> "$ENGINE_LOG"
 }
 trap cleanup EXIT INT TERM
 
-XEPHYR_READY=0
-for i in {1..25}; do
-    if [ -e "/tmp/.X11-unix/X${TARGET_DISP#:}" ]; then
-        XEPHYR_READY=1
+XORG_READY=0
+
+for i in {1..30}; do
+    if [ -S "/tmp/.X11-unix/X${TARGET_DISP#:}" ]; then
+        XORG_READY=1
         break
     fi
+
+    if ! kill -0 "$XORG_PID" 2>/dev/null; then
+        break
+    fi
+
     sleep 0.2
 done
 
-if [ "$XEPHYR_READY" -eq 0 ]; then
-    echo "[HATA] Xephyr başlatılamadı!" >> "$ENGINE_LOG"
-    exit 102
+if [ "$XORG_READY" -eq 0 ]; then
+    echo "[HATA] Rootless Xorg başlatılamadı!" >> "$ENGINE_LOG"
+    tail -40 "$ENGINE_LOG" >> "$ENGINE_LOG" 2>/dev/null || true
+    exit 103
+printf '%s\n' "$TARGET_DISP" > "$DISPLAY_FILE"
+chmod 600 "$DISPLAY_FILE"
+
 fi
 
-# Xephyr tek bir "default" output sağlar.
-# Cinnamon'un primary monitor algılayabilmesi için bunu açıkça primary yap.
-PRIMARY_OUTPUT="$(DISPLAY="$TARGET_DISP" xrandr --query 2>/dev/null | awk '/ connected/{print $1; exit}')"
+# 1366x768 modelini Xorg'a ekle.
+# Dummy driver bazı sistemlerde bu modu config'ten otomatik üretmez.
+if ! DISPLAY="$TARGET_DISP" xrandr --query 2>/dev/null |
+        grep -q '1366x768_60.00'; then
+
+    DISPLAY="$TARGET_DISP" xrandr --newmode "1366x768_60.00" \
+        85.50 1366 1440 1576 1780 768 771 775 798 \
+        -hsync +vsync >> "$ENGINE_LOG" 2>&1 || true
+
+    DISPLAY="$TARGET_DISP" xrandr \
+        --addmode DUMMY0 "1366x768_60.00" >> "$ENGINE_LOG" 2>&1 || true
+fi
+
+PRIMARY_OUTPUT="$(
+    DISPLAY="$TARGET_DISP" xrandr --query 2>/dev/null |
+    awk '/ connected/{print $1; exit}'
+)"
 
 if [ -n "$PRIMARY_OUTPUT" ]; then
-    if DISPLAY="$TARGET_DISP" xrandr --output "$PRIMARY_OUTPUT" --primary >> "$ENGINE_LOG" 2>&1; then
-        echo "[OK] X11 primary output: $PRIMARY_OUTPUT" >> "$ENGINE_LOG"
+    if DISPLAY="$TARGET_DISP" xrandr \
+        --output "$PRIMARY_OUTPUT" \
+        --mode "1366x768_60.00" \
+        --primary >> "$ENGINE_LOG" 2>&1; then
+
+        echo "[OK] Xorg primary output: $PRIMARY_OUTPUT (1366x768)" >> "$ENGINE_LOG"
     else
-        echo "[UYARI] Primary output ayarlanamadı: $PRIMARY_OUTPUT" >> "$ENGINE_LOG"
+        echo "[UYARI] 1366x768 ayarlanamadı, mevcut mod korunuyor." >> "$ENGINE_LOG"
     fi
 else
-    echo "[UYARI] X11 connected output bulunamadı." >> "$ENGINE_LOG"
+    echo "[HATA] Xorg connected output bulunamadı." >> "$ENGINE_LOG"
+    exit 104
 fi
 
 # 5. HATA DÜZELTMESİ: --dev /dev Geri Getirildi (Terminal PTS çökmelerini önler)
@@ -157,6 +214,7 @@ BWRAP_ARGS=(
     --ro-bind /usr/share/safebox/guest-etc/nsswitch.conf /etc/nsswitch.conf
     --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
     --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
+    --ro-bind /usr/share/safebox/guest-config /usr/share/safebox/guest-config
     --dev /dev
     --proc /proc
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
@@ -177,8 +235,12 @@ BWRAP_ARGS=(
     --setenv LOGNAME safebox
     --setenv DISPLAY "$TARGET_DISP"
     --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
-    --tmpfs /usr/share/applications
-    --ro-bind /usr/share/safebox/guest-apps /usr/share/applications
+--setenv XDG_DATA_DIRS "/opt:/usr/local/share:/usr/share"
+    # Sistem /usr/share/applications dizini görünür kalmalı:
+    # Cinnamon session gerekli .desktop bileşenlerini buradan bulur.
+    # SafeBox'a ait özel launcher'lar ayrı bir XDG data köküne bind edilir.
+    --dir /opt
+    --ro-bind /usr/share/safebox/guest-apps /opt/applications
     --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
     --die-with-parent
     --new-session
@@ -217,6 +279,7 @@ fi
 
 # X11 Socket
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
+
 
 # 6. cgroup v2 Gerçek Sınırlandırma ile Başlat
 CPU_QUOTA_VAL=$((CPU_CORES * 100))

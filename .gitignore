@@ -15,3 +15,7 @@ __pycache__/
 # Yerel test / backup dosyaları
 *.backup
 *.bak
+
+# Geçici geliştirme yedekleri
+*.before-cinnamon-session
+*.before-private-dbus

@@ -9,6 +9,7 @@ import os
 import sys
 import subprocess
 import threading
+from pathlib import Path
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -222,19 +223,122 @@ class SafeBoxGUI(Gtk.Window):
         audio = "1" if self.chk_audio.get_active() else "0"
         share = "1" if self.chk_share.get_active() else "0"
 
+        if getattr(self, "sandbox_proc", None) is not None:
+            if self.sandbox_proc.poll() is None:
+                self.append_log("[UYARI] SafeBox zaten çalışıyor.")
+                return
+
         self.btn_start.set_sensitive(False)
         self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}...")
 
-        def run_thread():
-            engine_path = "/usr/bin/safebox-core"
-            if not os.path.exists(engine_path):
-                engine_path = os.path.expanduser("~/safebox/usr/bin/safebox-core")
-            
-            cmd = [engine_path, ram, cpu, res, share, "1", audio, net]
-            proc = subprocess.run(cmd)
-            GLib.idle_add(self.on_sandbox_finished, proc.returncode)
+        engine_path = "/usr/bin/safebox-core"
+        if not os.path.exists(engine_path):
+            engine_path = os.path.expanduser("~/safebox/usr/bin/safebox-core")
 
-        threading.Thread(target=run_thread, daemon=True).start()
+        cmd = [engine_path, ram, cpu, res, share, "1", audio, net]
+
+        try:
+            self.sandbox_proc = subprocess.Popen(cmd)
+            self.append_log(f"[OK] SafeBox core çalışıyor (PID={self.sandbox_proc.pid}).")
+            self.append_log("[BEKLENİYOR] Sanal ekran hazırlanıyor...")
+
+            self.viewer_started = False
+            self.vnc_proc = None
+            self.viewer_proc = None
+
+            GLib.timeout_add(300, self.check_sandbox_process)
+            GLib.timeout_add(300, self.check_display_ready)
+
+        except Exception as e:
+            self.btn_start.set_sensitive(True)
+            self.append_log(f"[HATA] Core başlatılamadı: {e}")
+
+    def check_display_ready(self):
+        if self.viewer_started:
+            return False
+
+        # SafeBox tarafından başlatılan rootless Xorg'u bul.
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["pgrep", "-af", "/usr/lib/xorg/Xorg :"],
+                capture_output=True,
+                text=True,
+                timeout=1,
+            )
+
+            for line in result.stdout.splitlines():
+                if "/usr/share/safebox/xorg/safebox-dummy.conf" not in line:
+                    continue
+
+                parts = line.split()
+
+                for part in parts:
+                    if part.startswith(":") and part[1:].isdigit():
+                        display = part
+                        display_num = int(part[1:])
+                        vnc_port = 5900 + display_num
+
+                        self.append_log(
+                            f"[OK] Sanal ekran bulundu: DISPLAY={display}"
+                        )
+
+                        # Aynı ekran için ikinci kez VNC başlatılmasını engelle.
+                        self.viewer_started = True
+
+                        self.vnc_proc = subprocess.Popen([
+                            "x11vnc",
+                            "-display", display,
+                            "-auth", "/dev/null",
+                            "-localhost",
+                            "-nopw",
+                            "-rfbport", str(vnc_port),
+                            "-forever",
+                            "-shared",
+                            "-noxdamage",
+                            "-noshm",
+                        ], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+
+                        self.append_log(
+                            f"[OK] Görüntü köprüsü başlatıldı: VNC={vnc_port}"
+                        )
+
+                        GLib.timeout_add(
+                            1000,
+                            self.launch_vnc_viewer,
+                            display,
+                            display_num
+                        )
+
+                        return False
+
+        except Exception:
+            pass
+
+        if getattr(self, "sandbox_proc", None) is not None:
+            if self.sandbox_proc.poll() is not None:
+                self.btn_start.set_sensitive(True)
+                self.append_log("[HATA] SafeBox core sonlandı.")
+                return False
+
+        return True
+
+    def check_sandbox_process(self):
+        proc = getattr(self, "sandbox_proc", None)
+
+        if proc is None:
+            return False
+
+        returncode = proc.poll()
+
+        if returncode is None:
+            return True
+
+        self.on_sandbox_finished(returncode)
+        self.sandbox_proc = None
+        return False
 
     def on_sandbox_finished(self, returncode):
         self.btn_start.set_sensitive(True)
@@ -245,7 +349,20 @@ class SafeBoxGUI(Gtk.Window):
 
 def main():
     app = SafeBoxGUI()
-    app.connect("destroy", Gtk.main_quit)
+
+    def on_destroy(_widget):
+        for attr in ("viewer_proc", "vnc_proc", "sandbox_proc"):
+            proc = getattr(app, attr, None)
+            if proc is not None:
+                try:
+                    if proc.poll() is None:
+                        proc.terminate()
+                except Exception:
+                    pass
+
+        Gtk.main_quit()
+
+    app.connect("destroy", on_destroy)
     app.show_all()
     Gtk.main()
 
