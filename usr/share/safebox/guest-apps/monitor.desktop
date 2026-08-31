@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Sistem Gözlemcisi
+Exec=mate-system-monitor
+Icon=utilities-system-monitor
+Categories=System;

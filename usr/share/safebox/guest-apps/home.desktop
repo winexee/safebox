@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Ev Dizini
+Exec=thunar /home/safebox
+Icon=user-home
+Categories=System;

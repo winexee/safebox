@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+echo -e "\033[1;33m[SafeBox Bilgi]\033[0m SafeBox zaten güvenli sanal alan içinde çalışıyor!"
+echo "Sistem kaynaklarını incelemek için 'mate-system-monitor' yazabilirsiniz."
+exit 0

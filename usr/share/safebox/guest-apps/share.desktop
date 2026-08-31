@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Paylaşılan Klasör
+Exec=thunar /home/safebox/Paylasim
+Icon=folder-remote
+Categories=System;

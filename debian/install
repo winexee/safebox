@@ -4,3 +4,9 @@ usr/share/safebox/safebox_gui.py /usr/share/safebox/
 usr/share/applications/safebox.desktop /usr/share/applications/
 usr/share/icons/hicolor/scalable/apps/safebox.svg /usr/share/icons/hicolor/scalable/apps/
 usr/share/metainfo/com.winexe.safebox.metainfo.xml /usr/share/metainfo/
+usr/share/safebox/guest-init /usr/share/safebox/
+usr/share/safebox/guest-etc /usr/share/safebox/
+usr/share/safebox/guest-apps /usr/share/safebox/
+usr/share/safebox/guest-config /usr/share/safebox/
+usr/share/safebox/safebox-guest-blocker /usr/share/safebox/
+usr/share/safebox/xorg /usr/share/safebox/

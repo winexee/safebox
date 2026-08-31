@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Uygulama Menüsü
+Exec=rofi -show drun -config /usr/share/safebox/rofi/safebox_menu.rasi
+Icon=start-here-symbolic
+Categories=System;
