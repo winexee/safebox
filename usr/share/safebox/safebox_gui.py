@@ -125,10 +125,13 @@ class SafeBoxGUI(Gtk.Window):
         self.chk_audio.set_active(True)
         self.chk_share = Gtk.CheckButton(label="Paylaşılan Klasör (~/SafeBox-Paylasim Köprüsü)")
         self.chk_share.set_active(True)
+        self.chk_clipboard = Gtk.CheckButton(label="Çift Yönlü Pano Paylaşımı")
+        self.chk_clipboard.set_active(True)
 
         tab_perms.pack_start(self.chk_net, False, False, 0)
         tab_perms.pack_start(self.chk_audio, False, False, 0)
         tab_perms.pack_start(self.chk_share, False, False, 0)
+        tab_perms.pack_start(self.chk_clipboard, False, False, 0)
         notebook.append_page(tab_perms, Gtk.Label(label="İzinler ve İzolasyon"))
 
         # 4. Konsol ve Günlük
@@ -222,6 +225,7 @@ class SafeBoxGUI(Gtk.Window):
         net = "1" if self.chk_net.get_active() else "0"
         audio = "1" if self.chk_audio.get_active() else "0"
         share = "1" if self.chk_share.get_active() else "0"
+        clip = "1" if self.chk_clipboard.get_active() else "0"
 
         if getattr(self, "sandbox_proc", None) is not None:
             if self.sandbox_proc.poll() is None:
@@ -235,7 +239,7 @@ class SafeBoxGUI(Gtk.Window):
         if not os.path.exists(engine_path):
             engine_path = os.path.expanduser("~/safebox/usr/bin/safebox-core")
 
-        cmd = [engine_path, ram, cpu, res, share, "1", audio, net]
+        cmd = [engine_path, ram, cpu, res, share, clip, audio, net]
 
         try:
             self.sandbox_proc = subprocess.Popen(cmd)
@@ -344,6 +348,9 @@ class SafeBoxGUI(Gtk.Window):
                 f"[OK] Cinnamon görüntüsü açıldı: {display}"
             )
 
+            # Viewer kapanırsa SafeBox oturumunu da sonlandır.
+            GLib.timeout_add(500, self.check_viewer_process)
+
         except Exception as e:
             self.viewer_started = False
             self.append_log(
@@ -365,6 +372,34 @@ class SafeBoxGUI(Gtk.Window):
 
         self.on_sandbox_finished(returncode)
         self.sandbox_proc = None
+        return False
+
+    def check_viewer_process(self):
+        viewer = getattr(self, "viewer_proc", None)
+
+        if viewer is None:
+            return False
+
+        if viewer.poll() is None:
+            return True
+
+        self.append_log(
+            "[BİLGİ] Görüntüleyici kapandı; SafeBox oturumu sonlandırılıyor."
+        )
+
+        proc = getattr(self, "sandbox_proc", None)
+
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.terminate()
+            except Exception as e:
+                self.append_log(
+                    f"[UYARI] SafeBox core sonlandırılamadı: {e}"
+                )
+
+        self.viewer_proc = None
+        self.vnc_proc = None
+
         return False
 
     def on_sandbox_finished(self, returncode):

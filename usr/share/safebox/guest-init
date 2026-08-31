@@ -67,9 +67,9 @@ GTK4_EOF
 rm -f "$HOME/Desktop/"*.desktop "$HOME/Masaüstü/"*.desktop 2>/dev/null || true
 
 for app in browser home share terminal editor monitor; do
-    if [ -f "/opt/applications/${app}.desktop" ]; then
-        cp "/opt/applications/${app}.desktop" "$HOME/Desktop/" 2>/dev/null || true
-        cp "/opt/applications/${app}.desktop" "$HOME/Masaüstü/" 2>/dev/null || true
+    if [ -f "/usr/share/safebox/guest-apps/${app}.desktop" ]; then
+        cp "/usr/share/safebox/guest-apps/${app}.desktop" "$HOME/Desktop/" 2>/dev/null || true
+        cp "/usr/share/safebox/guest-apps/${app}.desktop" "$HOME/Masaüstü/" 2>/dev/null || true
     fi
 done
 
@@ -101,6 +101,13 @@ exec dbus-run-session -- bash -c '
       '\''panel1:right:8:calendar@cinnamon.org:11'\'',
       '\''panel1:right:9:cornerbar@cinnamon.org:12'\''
     ]"
+
+    # Host duvar kağıdını kullanma; SafeBox için düz koyu arka plan.
+    gsettings set org.cinnamon.desktop.background picture-uri "" 2>/dev/null || true
+    gsettings set org.cinnamon.desktop.background picture-uri-dark "" 2>/dev/null || true
+    gsettings set org.cinnamon.desktop.background primary-color "#202020" 2>/dev/null || true
+    gsettings set org.cinnamon.desktop.background secondary-color "#202020" 2>/dev/null || true
+    gsettings set org.cinnamon.desktop.background color-shading-type "solid" 2>/dev/null || true
 
     echo "[OK] SafeBox Cinnamon panel ayarları uygulandı."
 
