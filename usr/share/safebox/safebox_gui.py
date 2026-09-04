@@ -8,6 +8,7 @@ Original Classic UI & Cinnamon Integration
 import os
 import sys
 import subprocess
+import shlex
 import threading
 import gi
 
@@ -205,9 +206,24 @@ class SafeBoxGUI(Gtk.Window):
             self.append_log(f"SafeBox Sürüm: {VERSION}\nMasaüstü: Cinnamon 2D")
         elif cmd == "purge":
             try:
-                subprocess.run(["rm", "-rf", os.path.expanduser("~/.local/share/safebox/mock_*")], 
-                              capture_output=True, timeout=5)
-                self.append_log("Önbellek temizlendi.")
+                import glob
+
+                targets = glob.glob(
+                    os.path.expanduser("~/.local/share/safebox/mock_*")
+                )
+
+                for target in targets:
+                    subprocess.run(
+                        ["rm", "-rf", "--", target],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        check=False,
+                    )
+
+                self.append_log(
+                    f"Önbellek temizlendi. Öğeler: {len(targets)}"
+                )
             except Exception as e:
                 self.append_log(f"[HATA] Purge başarısız: {e}")
         elif cmd == "doctor":
@@ -277,7 +293,7 @@ class SafeBoxGUI(Gtk.Window):
         else:
             if self.dev_mode:
                 # Güvenlik: Whitelist kontrol
-                cmd_parts = raw_cmd.split()
+                cmd_parts = shlex.split(raw_cmd)
                 base_cmd = cmd_parts[0] if cmd_parts else ""
                 
                 if base_cmd not in ALLOWED_DEV_CMDS:

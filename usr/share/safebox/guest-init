@@ -3,7 +3,7 @@ export HOME=/home/safebox
 export USER=safebox
 export LOGNAME=safebox
 
-export XDG_DATA_DIRS=/usr/share/cinnamon:/usr/share/gnome:/usr/local/share/:/usr/share/
+export XDG_DATA_DIRS=/usr/local/share:/usr/share/cinnamon:/usr/share
 export XDG_CURRENT_DESKTOP=X-Cinnamon
 export XDG_SESSION_DESKTOP=cinnamon
 export DESKTOP_SESSION=cinnamon

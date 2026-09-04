@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Enterprise Hardened Engine (v1.7.6 - Security & Stability)
+# SafeBox Enterprise Hardened Engine (v1.7.6 - RootFS Hardened)
 set -euo pipefail
 
 RAM_GB="${1:-4}"
@@ -10,6 +10,8 @@ CLIPBOARD="${5:-1}"
 AUDIO="${6:-1}"
 NET="${7:-1}"
 
+ROOTFS="/var/lib/safebox/rootfs"
+
 LOG_DIR="${HOME}/.local/share/safebox"
 PROC_MOCK_DIR="${LOG_DIR}/mock_proc"
 SYS_MOCK_DIR="${LOG_DIR}/mock_sys"
@@ -17,7 +19,7 @@ ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
 mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu" "$ETC_MOCK_DIR"
 
-echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.1 Başlatılıyor ===" > "$ENGINE_LOG"
+echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.6 Başlatılıyor ===" > "$ENGINE_LOG"
 
 # 1. HATA DÜZELTMESİ: Çekirdek Kernel UUID Yedeği
 if which dbus-uuidgen >/dev/null 2>&1; then
@@ -28,7 +30,7 @@ fi
 
 cat << 'OS_EOF' > "${ETC_MOCK_DIR}/os-release"
 NAME="SafeBox OS"
-VERSION="1.7.1 (Hardened Sandbox)"
+VERSION="1.7.6 (Hardened Sandbox)"
 ID=safebox
 ID_LIKE=debian
 PRETTY_NAME="SafeBox Hardened Workspace"
@@ -138,7 +140,7 @@ if [ "$XEPHYR_READY" -eq 0 ]; then
     exit 102
 fi
 
-# 5. HATA DÜZELTMESİ: --dev /dev Geri Getirildi (Terminal PTS çökmelerini önler)
+# 5. Guest device namespace ve terminal PTS hazırlığı
 # Gerekli dosyalar var mı kontrol et
 REQUIRED_DIRS=(
     "/usr/share/safebox/guest-etc"
@@ -168,12 +170,7 @@ BWRAP_ARGS=(
     --uid 1000
     --gid 1000
     --hostname safebox-sandbox
-    --ro-bind /usr /usr
-    --ro-bind /lib /lib
-    --ro-bind /lib64 /lib64
-    --ro-bind /bin /bin
-    --ro-bind /sbin /sbin
-    --ro-bind /etc /etc
+    --ro-bind "$ROOTFS" /
     --ro-bind "${ETC_MOCK_DIR}/machine-id" /etc/machine-id
     --ro-bind "${ETC_MOCK_DIR}/os-release" /etc/os-release
     --ro-bind /usr/share/safebox/guest-etc/passwd /etc/passwd
@@ -256,17 +253,13 @@ if [ "$AUDIO" = "1" ]; then
     fi
 fi
 
-# Clipboard Eriş imi
-# Not: Clipboard socket'ı /tmp/.X11-unix üzerinden geçiyor
-# CLIPBOARD=1 ise, host clipboard'u sandbox'ta erişilebilir
+# Clipboard
+# X11 clipboard bir dosya socket'i değildir.
+# Gerçek clipboard bridge kurulmadıkça fail-closed davran.
 if [ "$CLIPBOARD" = "1" ]; then
-    # X11 clipboard manager socket (varsa)
-    if [ -e "${XDG_RUNTIME_DIR}/X11" ]; then
-        BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/X11" "/run/user/1000/X11")
-    fi
-    echo "[BİLGİ] Clipboard erişimi etkin (Dikkat: Host ↔ Sandbox)" >> "$ENGINE_LOG"
+    echo "[UYARI] Clipboard bridge henüz kurulmadı; clipboard aktarımı aktif değil." >> "$ENGINE_LOG"
 else
-    echo "[BİLGİ] Clipboard erişimi kapatıldı (Güvenli mod)" >> "$ENGINE_LOG"
+    echo "[BİLGİ] Clipboard erişimi kapalı." >> "$ENGINE_LOG"
 fi
 
 # Paylaşım Klasörü

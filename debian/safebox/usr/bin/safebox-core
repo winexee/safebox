@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Enterprise Hardened Engine (v1.7.1 - Bugfix)
+# SafeBox Enterprise Hardened Engine (v1.7.6 - RootFS Hardened)
 set -euo pipefail
 
 RAM_GB="${1:-4}"
@@ -10,6 +10,8 @@ CLIPBOARD="${5:-1}"
 AUDIO="${6:-1}"
 NET="${7:-1}"
 
+ROOTFS="/var/lib/safebox/rootfs"
+
 LOG_DIR="${HOME}/.local/share/safebox"
 PROC_MOCK_DIR="${LOG_DIR}/mock_proc"
 SYS_MOCK_DIR="${LOG_DIR}/mock_sys"
@@ -17,7 +19,7 @@ ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
 mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu" "$ETC_MOCK_DIR"
 
-echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.1 Başlatılıyor ===" > "$ENGINE_LOG"
+echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.6 Başlatılıyor ===" > "$ENGINE_LOG"
 
 # 1. HATA DÜZELTMESİ: Çekirdek Kernel UUID Yedeği
 if which dbus-uuidgen >/dev/null 2>&1; then
@@ -28,7 +30,7 @@ fi
 
 cat << 'OS_EOF' > "${ETC_MOCK_DIR}/os-release"
 NAME="SafeBox OS"
-VERSION="1.7.1 (Hardened Sandbox)"
+VERSION="1.7.6 (Hardened Sandbox)"
 ID=safebox
 ID_LIKE=debian
 PRETTY_NAME="SafeBox Hardened Workspace"
@@ -99,42 +101,76 @@ if [ -z "$TARGET_DISP" ]; then
     exit 101
 fi
 
+echo "[BİLGİ] Xephyr başlatılıyor: $TARGET_DISP" >> "$ENGINE_LOG"
 Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -title "SafeBox Secure Workspace ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
+
+# Dönüş değerini kontrol et
+if ! kill -0 "$XEPHYR_PID" 2>/dev/null; then
+    echo "[HATA] Xephyr process başlatılamadı!" >> "$ENGINE_LOG"
+    exit 102
+fi
 
 cleanup() {
     echo "[BİLGİ] Oturum kapatılıyor..." >> "$ENGINE_LOG"
     kill -9 "$XEPHYR_PID" 2>/dev/null || true
+    # X11 Lock dosyasını temizle
+    rm -f "/tmp/.X${TARGET_DISP#:}-lock" 2>/dev/null || true
+    rm -rf "/tmp/.X11-unix/X${TARGET_DISP#:}" 2>/dev/null || true
     echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Oturum Kapatıldı ===" >> "$ENGINE_LOG"
 }
 trap cleanup EXIT INT TERM
 
+# Xephyr hazır olana kadar bekle (Geliştirilmiş)
 XEPHYR_READY=0
-for i in {1..25}; do
+for i in {1..50}; do
     if [ -e "/tmp/.X11-unix/X${TARGET_DISP#:}" ]; then
-        XEPHYR_READY=1
-        break
+        # Ek kontrol: Socket'ı test et
+        if DISPLAY="$TARGET_DISP" xlsclients >/dev/null 2>&1 || [ $i -gt 30 ]; then
+            XEPHYR_READY=1
+            echo "[BİLGİ] Xephyr hazır (Deneme: $i)" >> "$ENGINE_LOG"
+            break
+        fi
     fi
-    sleep 0.2
+    sleep 0.1
 done
 
 if [ "$XEPHYR_READY" -eq 0 ]; then
-    echo "[HATA] Xephyr başlatılamadı!" >> "$ENGINE_LOG"
+    echo "[HATA] Xephyr başlatılamadı (Timeout)" >> "$ENGINE_LOG"
     exit 102
 fi
 
-# 5. HATA DÜZELTMESİ: --dev /dev Geri Getirildi (Terminal PTS çökmelerini önler)
+# 5. Guest device namespace ve terminal PTS hazırlığı
+# Gerekli dosyalar var mı kontrol et
+REQUIRED_DIRS=(
+    "/usr/share/safebox/guest-etc"
+    "/usr/share/safebox/guest-apps"
+    "/usr/share/safebox/safebox-guest-blocker"
+)
+
+for dir in "${REQUIRED_DIRS[@]}"; do
+    if [ ! -d "$dir" ] && [ ! -f "$dir" ]; then
+        echo "[HATA] Gerekli dosya/dizin bulunamadı: $dir" >> "$ENGINE_LOG"
+        echo "[UYARI] SafeBox düzgün yüklenmemiş olabilir. Lütfen paketi yeniden kurun." >> "$ENGINE_LOG"
+        exit 103
+    fi
+done
+
+# guest-etc dosyalarının varlığını kontrol et
+GUEST_ETC_FILES=("passwd" "group" "shadow" "nsswitch.conf" "hostname" "hosts")
+for file in "${GUEST_ETC_FILES[@]}"; do
+    if [ ! -f "/usr/share/safebox/guest-etc/$file" ]; then
+        echo "[HATA] /usr/share/safebox/guest-etc/$file bulunamadı!" >> "$ENGINE_LOG"
+        exit 104
+    fi
+done
+
 BWRAP_ARGS=(
     --unshare-all
     --uid 1000
     --gid 1000
     --hostname safebox-sandbox
-    --ro-bind /usr /usr
-    --ro-bind /lib /lib
-    --ro-bind /lib64 /lib64
-    --ro-bind /bin /bin
-    --ro-bind /sbin /sbin
-    --ro-bind /etc /etc
+    --ro-bind "$ROOTFS" /
     --ro-bind "${ETC_MOCK_DIR}/machine-id" /etc/machine-id
     --ro-bind "${ETC_MOCK_DIR}/os-release" /etc/os-release
     --ro-bind /usr/share/safebox/guest-etc/passwd /etc/passwd
@@ -143,7 +179,13 @@ BWRAP_ARGS=(
     --ro-bind /usr/share/safebox/guest-etc/nsswitch.conf /etc/nsswitch.conf
     --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
     --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
-    --dev /dev
+    --tmpfs /dev
+    --dev-bind /dev/null /dev/null
+    --dev-bind /dev/zero /dev/zero
+    --dev-bind /dev/full /dev/full
+    --dev-bind /dev/random /dev/random
+    --dev-bind /dev/urandom /dev/urandom
+    --dev-bind /dev/pts /dev/pts
     --proc /proc
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
     --ro-bind "${PROC_MOCK_DIR}/cpuinfo" /proc/cpuinfo
@@ -179,20 +221,45 @@ for nv_node in /dev/nvidia0 /dev/nvidiactl /dev/nvidia-modeset /dev/nvidia-uvm; 
     if [ -e "$nv_node" ]; then BWRAP_ARGS+=(--dev-bind "$nv_node" "$nv_node"); fi
 done
 
-# Ağ
+# Ağ - İzole Namespace (Network Isolation)
+# Not: --unshare-all ile ağ namespace'i varsayılan olarak izole edilmiştir
+# NET=1 seçilirse, DNS erişimi sağlanırken network izolasyonu korunur
 if [ "$NET" = "1" ]; then
-    BWRAP_ARGS+=(--share-net)
     if [ -d /run/systemd/resolve ]; then BWRAP_ARGS+=(--ro-bind /run/systemd/resolve /run/systemd/resolve); fi
     if [ -f /etc/resolv.conf ]; then BWRAP_ARGS+=(--ro-bind-try /etc/resolv.conf /etc/resolv.conf); fi
+    echo "[BİLGİ] Ağ namespace'i izole (DNS erişimi: etkin)" >> "$ENGINE_LOG"
+else
+    echo "[BİLGİ] Ağ erişimi kapatıldı" >> "$ENGINE_LOG"
 fi
 
-# Ses
+# Ses - XDG_RUNTIME_DIR kontrolü
 if [ "$AUDIO" = "1" ]; then
-    if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
-        BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/pulse/native" "/run/user/1000/pulse/native" --setenv PULSE_SERVER "unix:/run/user/1000/pulse/native")
-    elif [ -S "${XDG_RUNTIME_DIR}/pipewire-0" ]; then
-        BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/pipewire-0" "/run/user/1000/pipewire-0")
+    # XDG_RUNTIME_DIR belirlenmişse kullan, yoksa varsayılanı ayarla
+    if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+        XDG_RUNTIME_DIR="/run/user/$(id -u)"
+        echo "[UYARI] XDG_RUNTIME_DIR belirlenmedi, ayarlanıyor: $XDG_RUNTIME_DIR" >> "$ENGINE_LOG"
     fi
+
+    # PulseAudio Soket
+    if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
+        echo "[BİLGİ] PulseAudio soketi bulundu" >> "$ENGINE_LOG"
+        BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/pulse/native" "/run/user/1000/pulse/native" --setenv PULSE_SERVER "unix:/run/user/1000/pulse/native")
+    # PipeWire Soket
+    elif [ -S "${XDG_RUNTIME_DIR}/pipewire-0" ]; then
+        echo "[BİLGİ] PipeWire soketi bulundu" >> "$ENGINE_LOG"
+        BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/pipewire-0" "/run/user/1000/pipewire-0")
+    else
+        echo "[UYARI] Ses soketi bulunamadı (PulseAudio/PipeWire)" >> "$ENGINE_LOG"
+    fi
+fi
+
+# Clipboard
+# X11 clipboard bir dosya socket'i değildir.
+# Gerçek clipboard bridge kurulmadıkça fail-closed davran.
+if [ "$CLIPBOARD" = "1" ]; then
+    echo "[UYARI] Clipboard bridge henüz kurulmadı; clipboard aktarımı aktif değil." >> "$ENGINE_LOG"
+else
+    echo "[BİLGİ] Clipboard erişimi kapalı." >> "$ENGINE_LOG"
 fi
 
 # Paylaşım Klasörü
