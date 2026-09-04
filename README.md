@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04%20LTS-orange.svg)](https://ubuntu.com/)
-[![Release](https://img.shields.io/badge/Release-v1.7.5-brightgreen.svg)](https://github.com/winexee/safebox/releases)
+[![Release](https://img.shields.io/badge/Release-v1.7.6-brightgreen.svg)](https://github.com/winexee/safebox/releases)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Bash](https://img.shields.io/badge/Bash-5.0+-red.svg)](https://www.gnu.org/software/bash/)
 
@@ -52,7 +52,7 @@ sudo apt install safebox -y
 ### Yöntem 2: Direct .deb Paketi
 
 ```bash
-# Releases sayfasından v1.7.5+ indirin
+# Releases sayfasından v1.7.6+ indirin
 sudo apt install ./safebox_*.deb
 ```
 
@@ -131,7 +131,7 @@ sudo apt install \
 
 ## 📋 Sürüm Geçmişi
 
-### v1.7.5 (İŞLEMDE) - **Kritik Güvenlik & Stabilite Güncellemesi**
+### v1.7.6 - **Kritik Güvenlik & Stabilite Güncellemesi**
 - ✅ **XDG_RUNTIME_DIR** tanımlanmamış sorunu çözüldü (Ses crash fix)
 - ✅ Güvenlik açığı kapatıldı (shell=False, shlex.split)
 - ✅ Subprocess timeout eklendi (10s)
@@ -175,7 +175,7 @@ sudo apt install \
 │  ├─ UTS Namespace (hostname=safebox-sandbox)       │
 │  ├─ IPC Namespace (sıralar izole)                  │
 │  ├─ Mount Namespace (özel /proc, /sys, /etc)      │
-│  └─ Network Namespace (--share-net veya --unshare) │
+│  └─ Network Namespace (--unshare) │
 ├──────────────────────────────────────────────────────┤
 │ cgroup v2 (Kaynak Sınırlandırması)                 │
 │  ├─ MemoryMax: 1-16 GB                             │

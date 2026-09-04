@@ -9,6 +9,7 @@ import os
 import sys
 import subprocess
 import threading
+import shlex
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -205,79 +206,141 @@ class SafeBoxGUI(Gtk.Window):
             self.append_log(f"SafeBox Sürüm: {VERSION}\nMasaüstü: Cinnamon 2D")
         elif cmd == "purge":
             try:
-                subprocess.run(["rm", "-rf", os.path.expanduser("~/.local/share/safebox/mock_*")], 
-                              capture_output=True, timeout=5)
-                self.append_log("Önbellek temizlendi.")
+                import glob
+
+                pattern = os.path.expanduser("~/.local/share/safebox/mock_*")
+                targets = glob.glob(pattern)
+
+                for target in targets:
+                    subprocess.run(
+                        ["rm", "-rf", "--", target],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        check=False,
+                    )
+
+                self.append_log(
+                    f"Önbellek temizlendi. Silinen öğe sayısı: {len(targets)}"
+                )
+
+            except subprocess.TimeoutExpired:
+                self.append_log("[HATA] Purge zaman aşımına uğradı.")
             except Exception as e:
                 self.append_log(f"[HATA] Purge başarısız: {e}")
         elif cmd == "doctor":
-            # Gerçek sistem kontrolü
-            self.append_log("[🔍 SISTEM TESTİ BAŞLANIYOR]")
-            tests_passed = 0
-            tests_total = 0
-            
-            # Test 1: Namespace kontrol
-            tests_total += 1
+            self.append_log("[SISTEM TESTİ BAŞLIYOR]")
+
+            tests = []
+
+            def add_test(name, passed, detail=""):
+                tests.append((name, bool(passed), detail))
+
+            # Python / subprocess erişimi
             try:
-                result = subprocess.run(["cat", "/proc/self/ns/pid"], capture_output=True, text=True, timeout=2)
-                if result.returncode == 0:
-                    self.append_log("✓ PID Namespace: İzole")
-                    tests_passed += 1
-                else:
-                    self.append_log("✗ PID Namespace: Kontrol başarısız")
+                result = subprocess.run(
+                    ["id", "-u"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                    check=False,
+                )
+                uid = result.stdout.strip()
+                add_test("UID kontrolü", uid == "1000", f"uid={uid}")
             except Exception as e:
-                self.append_log(f"✗ PID Namespace: {e}")
-            
-            # Test 2: User namespace
-            tests_total += 1
+                add_test("UID kontrolü", False, str(e))
+
+            # Hostname
             try:
-                result = subprocess.run(["id"], capture_output=True, text=True, timeout=2)
-                if "uid=1000" in result.stdout or "root" in result.stdout:
-                    self.append_log(f"✓ User Namespace: İzole ({result.stdout.strip()})")
-                    tests_passed += 1
-                else:
-                    self.append_log(f"✗ User Namespace: Beklenmeyen çıktı")
+                result = subprocess.run(
+                    ["hostname"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                    check=False,
+                )
+                hostname = result.stdout.strip()
+                add_test(
+                    "Hostname",
+                    hostname == "safebox-sandbox",
+                    hostname or "boş",
+                )
             except Exception as e:
-                self.append_log(f"✗ User Namespace: {e}")
-            
-            # Test 3: Mount namespace
-            tests_total += 1
+                add_test("Hostname", False, str(e))
+
+            # PID namespace inode
             try:
-                result = subprocess.run(["mount"], capture_output=True, text=True, timeout=2)
-                mount_count = len(result.stdout.split("\n"))
-                if mount_count > 5:
-                    self.append_log(f"✓ Mount Namespace: İzole ({mount_count} mount)")
-                    tests_passed += 1
-                else:
-                    self.append_log(f"⚠ Mount Namespace: Düşük mount sayısı ({mount_count})")
+                pid_ns = Path("/proc/self/ns/pid").resolve()
+                add_test("PID namespace", pid_ns.exists(), str(pid_ns))
             except Exception as e:
-                self.append_log(f"✗ Mount Namespace: {e}")
-            
-            # Test 4: Cinnamon Desktop
-            tests_total += 1
+                add_test("PID namespace", False, str(e))
+
+            # Mount namespace inode
             try:
-                result = subprocess.run(["pgrep", "-f", "cinnamon"], capture_output=True, timeout=2)
-                if result.returncode == 0:
-                    self.append_log("✓ Cinnamon Desktop: Çalışıyor")
-                    tests_passed += 1
-                else:
-                    self.append_log("⚠ Cinnamon Desktop: Çalışmıyor (fallback modunda olabilir)")
+                mnt_ns = Path("/proc/self/ns/mnt").resolve()
+                add_test("Mount namespace", mnt_ns.exists(), str(mnt_ns))
             except Exception as e:
-                self.append_log(f"✗ Cinnamon Desktop: {e}")
-            
-            # Sonuç
-            percentage = int((tests_passed / tests_total) * 100)
-            self.append_log(f"\n[SONUÇ] {tests_passed}/{tests_total} test geçti ({percentage}%)")
-            if percentage >= 75:
-                self.append_log("✅ Sistem sağlıklı")
-            elif percentage >= 50:
-                self.append_log("⚠️ Sistem kısmen çalışıyor")
+                add_test("Mount namespace", False, str(e))
+
+            # Machine ID
+            try:
+                machine_id = Path("/etc/machine-id").read_text(
+                    encoding="utf-8",
+                    errors="ignore"
+                ).strip()
+
+                add_test(
+                    "Machine-ID",
+                    len(machine_id) >= 16,
+                    machine_id[:8] + "..." if machine_id else "boş"
+                )
+            except Exception as e:
+                add_test("Machine-ID", False, str(e))
+
+            # Cinnamon process
+            try:
+                result = subprocess.run(
+                    ["pgrep", "-f", "cinnamon"],
+                    capture_output=True,
+                    timeout=2,
+                    check=False,
+                )
+                add_test(
+                    "Cinnamon",
+                    result.returncode == 0,
+                    "çalışıyor" if result.returncode == 0 else "çalışmıyor",
+                )
+            except Exception as e:
+                add_test("Cinnamon", False, str(e))
+
+            passed = 0
+
+            for name, ok, detail in tests:
+                if ok:
+                    passed += 1
+                    self.append_log(f"[PASS] {name}: {detail}")
+                else:
+                    self.append_log(f"[FAIL] {name}: {detail}")
+
+            total = len(tests)
+            percentage = int((passed / total) * 100) if total else 0
+
+            self.append_log("")
+            self.append_log(
+                f"[SONUÇ] {passed}/{total} temel test geçti ({percentage}%)"
+            )
+
+            if percentage == 100:
+                self.append_log("[DURUM] Temel kontroller başarılı.")
+            elif percentage >= 70:
+                self.append_log("[DURUM] Sistem kısmen sağlıklı.")
             else:
-                self.append_log("❌ Sistem sorunlu")
+                self.append_log("[DURUM] Sistem sorunlu.")
+
         else:
             if self.dev_mode:
                 # Güvenlik: Whitelist kontrol
-                cmd_parts = raw_cmd.split()
+                cmd_parts = shlex.split(raw_cmd)
                 base_cmd = cmd_parts[0] if cmd_parts else ""
                 
                 if base_cmd not in ALLOWED_DEV_CMDS:

@@ -17,7 +17,7 @@ ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
 mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu" "$ETC_MOCK_DIR"
 
-echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.1 Başlatılıyor ===" > "$ENGINE_LOG"
+echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.6 Başlatılıyor ===" > "$ENGINE_LOG"
 
 # 1. HATA DÜZELTMESİ: Çekirdek Kernel UUID Yedeği
 if which dbus-uuidgen >/dev/null 2>&1; then
@@ -28,7 +28,7 @@ fi
 
 cat << 'OS_EOF' > "${ETC_MOCK_DIR}/os-release"
 NAME="SafeBox OS"
-VERSION="1.7.1 (Hardened Sandbox)"
+VERSION="1.7.6 (Hardened Sandbox)"
 ID=safebox
 ID_LIKE=debian
 PRETTY_NAME="SafeBox Hardened Workspace"
