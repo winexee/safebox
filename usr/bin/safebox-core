@@ -99,31 +99,70 @@ if [ -z "$TARGET_DISP" ]; then
     exit 101
 fi
 
+echo "[BİLGİ] Xephyr başlatılıyor: $TARGET_DISP" >> "$ENGINE_LOG"
 Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -title "SafeBox Secure Workspace ($TARGET_DISP)" -resizeable >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
+
+# Dönüş değerini kontrol et
+if ! kill -0 "$XEPHYR_PID" 2>/dev/null; then
+    echo "[HATA] Xephyr process başlatılamadı!" >> "$ENGINE_LOG"
+    exit 102
+fi
 
 cleanup() {
     echo "[BİLGİ] Oturum kapatılıyor..." >> "$ENGINE_LOG"
     kill -9 "$XEPHYR_PID" 2>/dev/null || true
+    # X11 Lock dosyasını temizle
+    rm -f "/tmp/.X${TARGET_DISP#:}-lock" 2>/dev/null || true
+    rm -rf "/tmp/.X11-unix/X${TARGET_DISP#:}" 2>/dev/null || true
     echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Oturum Kapatıldı ===" >> "$ENGINE_LOG"
 }
 trap cleanup EXIT INT TERM
 
+# Xephyr hazır olana kadar bekle (Geliştirilmiş)
 XEPHYR_READY=0
-for i in {1..25}; do
+for i in {1..50}; do
     if [ -e "/tmp/.X11-unix/X${TARGET_DISP#:}" ]; then
-        XEPHYR_READY=1
-        break
+        # Ek kontrol: Socket'ı test et
+        if DISPLAY="$TARGET_DISP" xlsclients >/dev/null 2>&1 || [ $i -gt 30 ]; then
+            XEPHYR_READY=1
+            echo "[BİLGİ] Xephyr hazır (Deneme: $i)" >> "$ENGINE_LOG"
+            break
+        fi
     fi
-    sleep 0.2
+    sleep 0.1
 done
 
 if [ "$XEPHYR_READY" -eq 0 ]; then
-    echo "[HATA] Xephyr başlatılamadı!" >> "$ENGINE_LOG"
+    echo "[HATA] Xephyr başlatılamadı (Timeout)" >> "$ENGINE_LOG"
     exit 102
 fi
 
 # 5. HATA DÜZELTMESİ: --dev /dev Geri Getirildi (Terminal PTS çökmelerini önler)
+# Gerekli dosyalar var mı kontrol et
+REQUIRED_DIRS=(
+    "/usr/share/safebox/guest-etc"
+    "/usr/share/safebox/guest-apps"
+    "/usr/share/safebox/safebox-guest-blocker"
+)
+
+for dir in "${REQUIRED_DIRS[@]}"; do
+    if [ ! -d "$dir" ] && [ ! -f "$dir" ]; then
+        echo "[HATA] Gerekli dosya/dizin bulunamadı: $dir" >> "$ENGINE_LOG"
+        echo "[UYARI] SafeBox düzgün yüklenmemiş olabilir. Lütfen paketi yeniden kurun." >> "$ENGINE_LOG"
+        exit 103
+    fi
+done
+
+# guest-etc dosyalarının varlığını kontrol et
+GUEST_ETC_FILES=("passwd" "group" "shadow" "nsswitch.conf" "hostname" "hosts")
+for file in "${GUEST_ETC_FILES[@]}"; do
+    if [ ! -f "/usr/share/safebox/guest-etc/$file" ]; then
+        echo "[HATA] /usr/share/safebox/guest-etc/$file bulunamadı!" >> "$ENGINE_LOG"
+        exit 104
+    fi
+done
+
 BWRAP_ARGS=(
     --unshare-all
     --uid 1000
@@ -186,12 +225,24 @@ if [ "$NET" = "1" ]; then
     if [ -f /etc/resolv.conf ]; then BWRAP_ARGS+=(--ro-bind-try /etc/resolv.conf /etc/resolv.conf); fi
 fi
 
-# Ses
+# Ses - XDG_RUNTIME_DIR kontrolü
 if [ "$AUDIO" = "1" ]; then
+    # XDG_RUNTIME_DIR belirlenmişse kullan, yoksa varsayılanı ayarla
+    if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+        XDG_RUNTIME_DIR="/run/user/$(id -u)"
+        echo "[UYARI] XDG_RUNTIME_DIR belirlenmedi, ayarlanıyor: $XDG_RUNTIME_DIR" >> "$ENGINE_LOG"
+    fi
+    
+    # PulseAudio Soket
     if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
+        echo "[BİLGİ] PulseAudio soketi bulundu" >> "$ENGINE_LOG"
         BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/pulse/native" "/run/user/1000/pulse/native" --setenv PULSE_SERVER "unix:/run/user/1000/pulse/native")
+    # PipeWire Soket
     elif [ -S "${XDG_RUNTIME_DIR}/pipewire-0" ]; then
+        echo "[BİLGİ] PipeWire soketi bulundu" >> "$ENGINE_LOG"
         BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/pipewire-0" "/run/user/1000/pipewire-0")
+    else
+        echo "[UYARI] Ses soketi bulunamadı (PulseAudio/PipeWire)" >> "$ENGINE_LOG"
     fi
 fi
 

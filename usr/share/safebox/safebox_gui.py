@@ -186,29 +186,51 @@ class SafeBoxGUI(Gtk.Window):
         cmd = raw_cmd.lower()
         self.append_log(f"> {raw_cmd}")
         
+        # Izin verilen komutlar (whitelist)
+        ALLOWED_DEV_CMDS = {"uname", "whoami", "pwd", "ls", "echo", "date"}
+        
         if cmd == "clear":
             self.console_view.get_buffer().set_text("")
         elif cmd == "developer":
             self.dev_mode = not self.dev_mode
             st = "AÇIK" if self.dev_mode else "KAPALI"
             self.append_log(f"Geliştirici Modu: {st}")
+            self.append_log("İzin verilen komutlar: uname, whoami, pwd, ls, echo, date")
         elif cmd == "status":
             self.append_log("SafeBox Durumu: Hazır\nMasaüstü: Cinnamon")
         elif cmd == "sysinfo":
             self.append_log(f"SafeBox Sürüm: {VERSION}\nMasaüstü: Cinnamon 2D")
         elif cmd == "purge":
-            os.system("rm -rf ~/.local/share/safebox/mock_*")
-            self.append_log("Önbellek temizlendi.")
+            try:
+                subprocess.run(["rm", "-rf", os.path.expanduser("~/.local/share/safebox/mock_*")], 
+                              capture_output=True, timeout=5)
+                self.append_log("Önbellek temizlendi.")
+            except Exception as e:
+                self.append_log(f"[HATA] Purge başarısız: {e}")
         elif cmd == "doctor":
             self.append_log("[PASS] Çekirdek İzolasyonu\n[PASS] Cinnamon Masaüstü Yalıtımı")
         else:
             if self.dev_mode:
+                # Güvenlik: Whitelist kontrol
+                cmd_parts = raw_cmd.split()
+                base_cmd = cmd_parts[0] if cmd_parts else ""
+                
+                if base_cmd not in ALLOWED_DEV_CMDS:
+                    self.append_log(f"[HATA] '{base_cmd}' komutuna izin yok!")
+                    self.append_log(f"İzin verilen komutlar: {', '.join(ALLOWED_DEV_CMDS)}")
+                    return
+                
                 try:
-                    res = subprocess.run(raw_cmd, shell=True, capture_output=True, text=True, timeout=5)
+                    # Shell=False ile argümanları Array olarak geç (GÜVENLI)
+                    res = subprocess.run(cmd_parts, capture_output=True, text=True, timeout=5)
                     if res.stdout:
                         self.append_log(res.stdout.strip())
                     if res.stderr:
                         self.append_log(f"[STDERR] {res.stderr.strip()}")
+                    if res.returncode != 0:
+                        self.append_log(f"[UYARI] Çıkış kodu: {res.returncode}")
+                except subprocess.TimeoutExpired:
+                    self.append_log("[HATA] Komut zaman aşımına uğradı (5s)")
                 except Exception as e:
                     self.append_log(f"[HATA] {e}")
             else:

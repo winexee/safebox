@@ -15,13 +15,27 @@ export GVFS_DISABLE_FUSE=1
 mkdir -p /home/safebox/{Desktop,Masaüstü,İndirilenler,Belgeler,Paylasim}
 
 # Masaüstü Simgeleri
+echo "[BİLGİ] Masaüstü simgeleri kurulu..."
 for app in browser home share terminal editor monitor; do
-    if [ -f "/usr/share/safebox/guest-apps/${app}.desktop" ]; then
-        cp "/usr/share/safebox/guest-apps/${app}.desktop" /home/safebox/Desktop/ 2>/dev/null || true
-        cp "/usr/share/safebox/guest-apps/${app}.desktop" /home/safebox/Masaüstü/ 2>/dev/null || true
+    app_file="/usr/share/safebox/guest-apps/${app}.desktop"
+    if [ -f "$app_file" ]; then
+        if cp "$app_file" /home/safebox/Desktop/ 2>/dev/null; then
+            chmod +x /home/safebox/Desktop/${app}.desktop 2>/dev/null || true
+        else
+            echo "[UYARI] ${app}.desktop Desktop'a kopyalanamadı" >&2
+        fi
+        
+        if cp "$app_file" /home/safebox/Masaüstü/ 2>/dev/null; then
+            chmod +x /home/safebox/Masaüstü/${app}.desktop 2>/dev/null || true
+        else
+            echo "[UYARI] ${app}.desktop Masaüstü'ne kopyalanamadı" >&2
+        fi
+    else
+        echo "[UYARI] Masaüstü simgesi bulunamadı: $app_file" >&2
     fi
 done
-chmod +x /home/safebox/Desktop/*.desktop /home/safebox/Masaüstü/*.desktop 2>/dev/null || true
+
+echo "[BİLGİ] Masaüstü hazırlandı"
 
 # Cinnamon Masaüstünü 2D Modunda Güvenle Başlat
 if which cinnamon2d >/dev/null 2>&1; then
