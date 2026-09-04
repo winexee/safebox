@@ -42,7 +42,7 @@ class SafeBoxGUI(Gtk.Window):
         title_lbl = Gtk.Label()
         title_lbl.set_markup(f"<b><big>SafeBox Güvenli Alan</big></b> <small>v{VERSION}</small>")
         title_lbl.set_xalign(0)
-        sub_lbl = Gtk.Label(label="Sistemden tam izole edilmiş güvenli sanal masaüstü ortamı")
+        sub_lbl = Gtk.Label(label="Sınırlandırılmış (Sandboxed) kontrollü sanal masaüstü ortamı")
         sub_lbl.set_xalign(0)
         title_vbox.pack_start(title_lbl, False, False, 0)
         title_vbox.pack_start(sub_lbl, False, False, 0)
@@ -125,7 +125,7 @@ class SafeBoxGUI(Gtk.Window):
         self.chk_audio.set_active(True)
         self.chk_share = Gtk.CheckButton(label="Paylaşılan Klasör (~/SafeBox-Paylasim Köprüsü)")
         self.chk_share.set_active(True)
-        self.chk_clipboard = Gtk.CheckButton(label="Clipboard Erişimi (Host ↔ Sandbox arası kopyala-yapıştır)")
+        self.chk_clipboard = Gtk.CheckButton(label="Clipboard Erişimi (Henüz Desteklenmiyor) (Host ↔ Sandbox arası kopyala-yapıştır)")
         self.chk_clipboard.set_active(False)
 
         tab_perms.pack_start(self.chk_net, False, False, 0)
@@ -235,7 +235,7 @@ class SafeBoxGUI(Gtk.Window):
             # Test 1: Namespace kontrol
             tests_total += 1
             try:
-                result = subprocess.run(["cat", "/proc/self/ns/pid"], capture_output=True, text=True, timeout=2)
+                result = subprocess.run(["bwrap", "--unshare-pid", "--", "cat", "/proc/self/ns/pid"], capture_output=True, text=True, timeout=2)
                 if result.returncode == 0:
                     self.append_log("✓ PID Namespace: İzole")
                     tests_passed += 1
@@ -247,7 +247,7 @@ class SafeBoxGUI(Gtk.Window):
             # Test 2: User namespace
             tests_total += 1
             try:
-                result = subprocess.run(["id"], capture_output=True, text=True, timeout=2)
+                result = subprocess.run(["bwrap", "--unshare-user", "--uid", "1000", "--", "id"], capture_output=True, text=True, timeout=2)
                 if "uid=1000" in result.stdout or "root" in result.stdout:
                     self.append_log(f"✓ User Namespace: İzole ({result.stdout.strip()})")
                     tests_passed += 1

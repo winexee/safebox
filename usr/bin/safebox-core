@@ -185,7 +185,7 @@ BWRAP_ARGS=(
     --dev-bind /dev/full /dev/full
     --dev-bind /dev/random /dev/random
     --dev-bind /dev/urandom /dev/urandom
-    --dev-bind /dev/pts /dev/pts
+    --dev /dev
     --proc /proc
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
     --ro-bind "${PROC_MOCK_DIR}/cpuinfo" /proc/cpuinfo
@@ -225,6 +225,8 @@ done
 # Not: --unshare-all ile ağ namespace'i varsayılan olarak izole edilmiştir
 # NET=1 seçilirse, DNS erişimi sağlanırken network izolasyonu korunur
 if [ "$NET" = "1" ]; then
+    echo "[BİLGİ] Ağ köprüsü (slirp4netns) başlatılıyor..."
+    # TODO: İleriki sürümde buraya slirp4netns komutları eklenecek.
     if [ -d /run/systemd/resolve ]; then BWRAP_ARGS+=(--ro-bind /run/systemd/resolve /run/systemd/resolve); fi
     if [ -f /etc/resolv.conf ]; then BWRAP_ARGS+=(--ro-bind-try /etc/resolv.conf /etc/resolv.conf); fi
     echo "[BİLGİ] Ağ namespace'i izole (DNS erişimi: etkin)" >> "$ENGINE_LOG"
