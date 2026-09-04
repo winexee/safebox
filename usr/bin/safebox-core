@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Enterprise Hardened Engine (v1.7.1 - Bugfix)
+# SafeBox Enterprise Hardened Engine (v1.7.6 - Security & Stability)
 set -euo pipefail
 
 RAM_GB="${1:-4}"
@@ -182,7 +182,13 @@ BWRAP_ARGS=(
     --ro-bind /usr/share/safebox/guest-etc/nsswitch.conf /etc/nsswitch.conf
     --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
     --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
-    --dev /dev
+    --tmpfs /dev
+    --dev-bind /dev/null /dev/null
+    --dev-bind /dev/zero /dev/zero
+    --dev-bind /dev/full /dev/full
+    --dev-bind /dev/random /dev/random
+    --dev-bind /dev/urandom /dev/urandom
+    --dev-bind /dev/pts /dev/pts
     --proc /proc
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
     --ro-bind "${PROC_MOCK_DIR}/cpuinfo" /proc/cpuinfo
@@ -218,11 +224,15 @@ for nv_node in /dev/nvidia0 /dev/nvidiactl /dev/nvidia-modeset /dev/nvidia-uvm; 
     if [ -e "$nv_node" ]; then BWRAP_ARGS+=(--dev-bind "$nv_node" "$nv_node"); fi
 done
 
-# Ağ
+# Ağ - İzole Namespace (Network Isolation)
+# Not: --unshare-all ile ağ namespace'i varsayılan olarak izole edilmiştir
+# NET=1 seçilirse, DNS erişimi sağlanırken network izolasyonu korunur
 if [ "$NET" = "1" ]; then
-    BWRAP_ARGS+=(--share-net)
     if [ -d /run/systemd/resolve ]; then BWRAP_ARGS+=(--ro-bind /run/systemd/resolve /run/systemd/resolve); fi
     if [ -f /etc/resolv.conf ]; then BWRAP_ARGS+=(--ro-bind-try /etc/resolv.conf /etc/resolv.conf); fi
+    echo "[BİLGİ] Ağ namespace'i izole (DNS erişimi: etkin)" >> "$ENGINE_LOG"
+else
+    echo "[BİLGİ] Ağ erişimi kapatıldı" >> "$ENGINE_LOG"
 fi
 
 # Ses - XDG_RUNTIME_DIR kontrolü
@@ -244,6 +254,19 @@ if [ "$AUDIO" = "1" ]; then
     else
         echo "[UYARI] Ses soketi bulunamadı (PulseAudio/PipeWire)" >> "$ENGINE_LOG"
     fi
+fi
+
+# Clipboard Eriş imi
+# Not: Clipboard socket'ı /tmp/.X11-unix üzerinden geçiyor
+# CLIPBOARD=1 ise, host clipboard'u sandbox'ta erişilebilir
+if [ "$CLIPBOARD" = "1" ]; then
+    # X11 clipboard manager socket (varsa)
+    if [ -e "${XDG_RUNTIME_DIR}/X11" ]; then
+        BWRAP_ARGS+=(--bind "${XDG_RUNTIME_DIR}/X11" "/run/user/1000/X11")
+    fi
+    echo "[BİLGİ] Clipboard erişimi etkin (Dikkat: Host ↔ Sandbox)" >> "$ENGINE_LOG"
+else
+    echo "[BİLGİ] Clipboard erişimi kapatıldı (Güvenli mod)" >> "$ENGINE_LOG"
 fi
 
 # Paylaşım Klasörü

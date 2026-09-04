@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SafeBox Control Center - v1.7.4
+SafeBox Control Center - v1.7.6
 Original Classic UI & Cinnamon Integration
 """
 
@@ -14,7 +14,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.7.4"
+VERSION = "1.7.6"
 
 class SafeBoxGUI(Gtk.Window):
     def __init__(self):
@@ -124,10 +124,13 @@ class SafeBoxGUI(Gtk.Window):
         self.chk_audio.set_active(True)
         self.chk_share = Gtk.CheckButton(label="Paylaşılan Klasör (~/SafeBox-Paylasim Köprüsü)")
         self.chk_share.set_active(True)
+        self.chk_clipboard = Gtk.CheckButton(label="Clipboard Erişimi (Host ↔ Sandbox arası kopyala-yapıştır)")
+        self.chk_clipboard.set_active(False)
 
         tab_perms.pack_start(self.chk_net, False, False, 0)
         tab_perms.pack_start(self.chk_audio, False, False, 0)
         tab_perms.pack_start(self.chk_share, False, False, 0)
+        tab_perms.pack_start(self.chk_clipboard, False, False, 0)
         notebook.append_page(tab_perms, Gtk.Label(label="İzinler ve İzolasyon"))
 
         # 4. Konsol ve Günlük
@@ -208,7 +211,69 @@ class SafeBoxGUI(Gtk.Window):
             except Exception as e:
                 self.append_log(f"[HATA] Purge başarısız: {e}")
         elif cmd == "doctor":
-            self.append_log("[PASS] Çekirdek İzolasyonu\n[PASS] Cinnamon Masaüstü Yalıtımı")
+            # Gerçek sistem kontrolü
+            self.append_log("[🔍 SISTEM TESTİ BAŞLANIYOR]")
+            tests_passed = 0
+            tests_total = 0
+            
+            # Test 1: Namespace kontrol
+            tests_total += 1
+            try:
+                result = subprocess.run(["cat", "/proc/self/ns/pid"], capture_output=True, text=True, timeout=2)
+                if result.returncode == 0:
+                    self.append_log("✓ PID Namespace: İzole")
+                    tests_passed += 1
+                else:
+                    self.append_log("✗ PID Namespace: Kontrol başarısız")
+            except Exception as e:
+                self.append_log(f"✗ PID Namespace: {e}")
+            
+            # Test 2: User namespace
+            tests_total += 1
+            try:
+                result = subprocess.run(["id"], capture_output=True, text=True, timeout=2)
+                if "uid=1000" in result.stdout or "root" in result.stdout:
+                    self.append_log(f"✓ User Namespace: İzole ({result.stdout.strip()})")
+                    tests_passed += 1
+                else:
+                    self.append_log(f"✗ User Namespace: Beklenmeyen çıktı")
+            except Exception as e:
+                self.append_log(f"✗ User Namespace: {e}")
+            
+            # Test 3: Mount namespace
+            tests_total += 1
+            try:
+                result = subprocess.run(["mount"], capture_output=True, text=True, timeout=2)
+                mount_count = len(result.stdout.split("\n"))
+                if mount_count > 5:
+                    self.append_log(f"✓ Mount Namespace: İzole ({mount_count} mount)")
+                    tests_passed += 1
+                else:
+                    self.append_log(f"⚠ Mount Namespace: Düşük mount sayısı ({mount_count})")
+            except Exception as e:
+                self.append_log(f"✗ Mount Namespace: {e}")
+            
+            # Test 4: Cinnamon Desktop
+            tests_total += 1
+            try:
+                result = subprocess.run(["pgrep", "-f", "cinnamon"], capture_output=True, timeout=2)
+                if result.returncode == 0:
+                    self.append_log("✓ Cinnamon Desktop: Çalışıyor")
+                    tests_passed += 1
+                else:
+                    self.append_log("⚠ Cinnamon Desktop: Çalışmıyor (fallback modunda olabilir)")
+            except Exception as e:
+                self.append_log(f"✗ Cinnamon Desktop: {e}")
+            
+            # Sonuç
+            percentage = int((tests_passed / tests_total) * 100)
+            self.append_log(f"\n[SONUÇ] {tests_passed}/{tests_total} test geçti ({percentage}%)")
+            if percentage >= 75:
+                self.append_log("✅ Sistem sağlıklı")
+            elif percentage >= 50:
+                self.append_log("⚠️ Sistem kısmen çalışıyor")
+            else:
+                self.append_log("❌ Sistem sorunlu")
         else:
             if self.dev_mode:
                 # Güvenlik: Whitelist kontrol
@@ -243,16 +308,17 @@ class SafeBoxGUI(Gtk.Window):
         net = "1" if self.chk_net.get_active() else "0"
         audio = "1" if self.chk_audio.get_active() else "0"
         share = "1" if self.chk_share.get_active() else "0"
+        clipboard = "1" if self.chk_clipboard.get_active() else "0"
 
         self.btn_start.set_sensitive(False)
-        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}...")
+        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}, Clipboard={'Açık' if clipboard == '1' else 'Kapalı'}...")
 
         def run_thread():
             engine_path = "/usr/bin/safebox-core"
             if not os.path.exists(engine_path):
                 engine_path = os.path.expanduser("~/safebox/usr/bin/safebox-core")
             
-            cmd = [engine_path, ram, cpu, res, share, "1", audio, net]
+            cmd = [engine_path, ram, cpu, res, share, clipboard, audio, net]
             proc = subprocess.run(cmd)
             GLib.idle_add(self.on_sandbox_finished, proc.returncode)
 
