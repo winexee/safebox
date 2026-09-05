@@ -227,6 +227,10 @@ done
 if [ "$NET" = "1" ]; then
     echo "[BİLGİ] Ağ köprüsü (slirp4netns) başlatılıyor..."
     # TODO: İleriki sürümde buraya slirp4netns komutları eklenecek.
+    echo "[BİLGİ] Ağ köprüsü (slirp4netns) başlatılıyor..."
+    # TODO: İleriki sürümde buraya slirp4netns komutları eklenecek.
+    echo "[BİLGİ] Ağ köprüsü (slirp4netns) başlatılıyor..."
+    # TODO: İleriki sürümde buraya slirp4netns komutları eklenecek.
     if [ -d /run/systemd/resolve ]; then BWRAP_ARGS+=(--ro-bind /run/systemd/resolve /run/systemd/resolve); fi
     if [ -f /etc/resolv.conf ]; then BWRAP_ARGS+=(--ro-bind-try /etc/resolv.conf /etc/resolv.conf); fi
     echo "[BİLGİ] Ağ namespace'i izole (DNS erişimi: etkin)" >> "$ENGINE_LOG"

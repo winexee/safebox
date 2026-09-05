@@ -125,7 +125,7 @@ class SafeBoxGUI(Gtk.Window):
         self.chk_audio.set_active(True)
         self.chk_share = Gtk.CheckButton(label="Paylaşılan Klasör (~/SafeBox-Paylasim Köprüsü)")
         self.chk_share.set_active(True)
-        self.chk_clipboard = Gtk.CheckButton(label="Clipboard Erişimi (Henüz Desteklenmiyor) (Host ↔ Sandbox arası kopyala-yapıştır)")
+        self.chk_clipboard = Gtk.CheckButton(label="Clipboard Erişimi (Henüz Desteklenmiyor) (Henüz Desteklenmiyor) (Henüz Desteklenmiyor) (Host ↔ Sandbox arası kopyala-yapıştır)")
         self.chk_clipboard.set_active(False)
 
         tab_perms.pack_start(self.chk_net, False, False, 0)
