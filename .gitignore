@@ -1,4 +1,29 @@
+# Build artifacts
+*.deb
+*.build
+*.changes
+*.buildinfo
+
+# Nano editor backups
+*.save
+*.save.*
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
-.pytest_cache/
+
+# Debian build
+debian/safebox/
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/safebox.substvars
+debian/*.log
+debian/changelog.dch
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~

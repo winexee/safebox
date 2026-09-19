@@ -179,13 +179,12 @@ BWRAP_ARGS=(
     --ro-bind /usr/share/safebox/guest-etc/nsswitch.conf /etc/nsswitch.conf
     --ro-bind /usr/share/safebox/guest-etc/hostname /etc/hostname
     --ro-bind /usr/share/safebox/guest-etc/hosts /etc/hosts
-    --tmpfs /dev
+    --dev /dev
     --dev-bind /dev/null /dev/null
     --dev-bind /dev/zero /dev/zero
     --dev-bind /dev/full /dev/full
     --dev-bind /dev/random /dev/random
     --dev-bind /dev/urandom /dev/urandom
-    --dev /dev
     --proc /proc
     --ro-bind "${PROC_MOCK_DIR}/meminfo" /proc/meminfo
     --ro-bind "${PROC_MOCK_DIR}/cpuinfo" /proc/cpuinfo
@@ -225,10 +224,6 @@ done
 # Not: --unshare-all ile ağ namespace'i varsayılan olarak izole edilmiştir
 # NET=1 seçilirse, DNS erişimi sağlanırken network izolasyonu korunur
 if [ "$NET" = "1" ]; then
-    echo "[BİLGİ] Ağ köprüsü (slirp4netns) başlatılıyor..."
-    # TODO: İleriki sürümde buraya slirp4netns komutları eklenecek.
-    echo "[BİLGİ] Ağ köprüsü (slirp4netns) başlatılıyor..."
-    # TODO: İleriki sürümde buraya slirp4netns komutları eklenecek.
     echo "[BİLGİ] Ağ köprüsü (slirp4netns) başlatılıyor..."
     # TODO: İleriki sürümde buraya slirp4netns komutları eklenecek.
     if [ -d /run/systemd/resolve ]; then BWRAP_ARGS+=(--ro-bind /run/systemd/resolve /run/systemd/resolve); fi

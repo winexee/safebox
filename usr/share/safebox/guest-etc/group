@@ -1,0 +1,7 @@
+root:x:0:
+safebox:x:1000:
+adm:x:4:safebox
+audio:x:29:safebox
+video:x:44:safebox
+plugdev:x:46:safebox
+nogroup:x:65534:

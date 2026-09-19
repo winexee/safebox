@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Dosya Yöneticisi
+GenericName=File Manager
+Comment=Dosyalarınızı yönetin
+Exec=nemo %U
+Icon=system-file-manager
+Terminal=false
+Categories=System;FileManager;
+StartupNotify=true

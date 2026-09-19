@@ -1,6 +1,0 @@
-safebox (1.7.4-1~ppa1~noble1) noble; urgency=medium
-
-  * Cinnamon 2D oturumu entegre edildi, 133 başlatma çökmesi giderildi.
-  * GUI birebir orijinal v1.6.4 düzenine döndürüldü.
-
- -- Mehmet Akif Şahin <mehmetakifsahin500@gmail.com>  Mon, 31 Aug 2026 00:05:00 +0300

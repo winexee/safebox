@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Paylaşım Klasörü
+GenericName=Shared Folder
+Comment=Ana sistem ile dosya paylaşım klasörü
+Exec=nemo /home/safebox/Paylasim
+Icon=folder-publicshare
+Terminal=false
+Categories=System;FileManager;
+StartupNotify=true

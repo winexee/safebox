@@ -1,0 +1,13 @@
+#!/bin/bash
+# SafeBox Guest Blocker
+# Bu betik sandbox içinde /home/safebox/.local/bin/safebox olarak bağlanır.
+# Sandbox içinden tekrar SafeBox çalıştırılmasını engeller (iç içe sandbox koruması).
+
+echo "╔══════════════════════════════════════════════════╗"
+echo "║  ⚠  SafeBox zaten bir sandbox ortamında          ║"
+echo "║     çalışıyor. İç içe sandbox desteklenmiyor.    ║"
+echo "║                                                  ║"
+echo "║  Bu güvenli alandayken SafeBox tekrar             ║"
+echo "║  başlatılamaz.                                    ║"
+echo "╚══════════════════════════════════════════════════╝"
+exit 1

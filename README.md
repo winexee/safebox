@@ -2,11 +2,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04%20LTS-orange.svg)](https://ubuntu.com/)
-[![Release](https://img.shields.io/badge/Release-v1.7.5-brightgreen.svg)](https://github.com/winexee/safebox/releases)
+[![Release](https://img.shields.io/badge/Release-v1.7.6-brightgreen.svg)](https://github.com/winexee/safebox/releases)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Bash](https://img.shields.io/badge/Bash-5.0+-red.svg)](https://www.gnu.org/software/bash/)
 
-SafeBox, Linux üzerinde güvenilmeyen dosyaları çalıştırmak, güvenli web gezintisi yapmak ve sistemi kalıntılardan korumak için **Bubblewrap** altyapısını kullanan hafif, izole bir **MATE** sanal masaüstü ortamıdır. Tam sistem izolasyonu, donanım hızlandırması ve sıfır kalıntı garantisi sunar.
+SafeBox, Linux üzerinde güvenilmeyen dosyaları çalıştırmak, güvenli web gezintisi yapmak ve sistemi kalıntılardan korumak için **Bubblewrap** altyapısını kullanan hafif, izole bir **Cinnamon** sanal masaüstü ortamıdır. Tam sistem izolasyonu, donanım hızlandırması ve sıfır kalıntı garantisi sunar.
 
 ---
 
@@ -20,7 +20,7 @@ SafeBox, Linux üzerinde güvenilmeyen dosyaları çalıştırmak, güvenli web 
 * **Sistem Bütünlüğü:** Sistem dosyaları read-only bağlanır
 
 ### 🖥️ Kullanıcı Deneyimi
-* **Modern MATE Arayüzü:** Yaru teması ile optimize edilmiş modern masaüstü
+* **Modern Cinnamon Arayüzü:** Yaru teması ile optimize edilmiş modern masaüstü
 * **Hafif & Hızlı:** Minimal bileşenlerle düşük sistem kullanımı
 * **Kontrol Merkezi:** GTK3 GUI ile kolay konfigürasyon ve izleme
 
@@ -32,9 +32,9 @@ SafeBox, Linux üzerinde güvenilmeyen dosyaları çalıştırmak, güvenli web 
 
 ### 📦 Standart Araçlar
 * **Firefox:** Güvenli web tarayıcısı
-* **Caja:** Dosya yöneticisi
-* **MATE Terminal:** Komut satırı
-* **Eye of MATE:** Resim görüntüleyici
+* **Nemo:** Dosya yöneticisi
+* **GNOME Terminal:** Komut satırı
+* **Resim Görüntüleyici:** Resim görüntüleyici
 * **Video Oynatıcı:** Multimedya desteği (Celluloid/Totem/VLC)
 
 ---
@@ -155,7 +155,7 @@ sudo apt install \
 - Winexe yayıncı optimizasyonu
 
 ### v1.2.0 - İlk Çıkış
-- MATE masaüstü desteği
+- Cinnamon masaüstü desteği
 - Bubblewrap izolasyonu
 - 5 temel uygulama
 
@@ -184,7 +184,7 @@ sudo apt install \
 │ Xephyr (Sanal X Sunucusu)                          │
 │  └─ X11 display: :10-:99 (dynamic)                │
 ├──────────────────────────────────────────────────────┤
-│ MATE Masaüstü (Sandboxed)                          │
+│ Cinnamon Masaüstü (Sandboxed)                       │
 │  ├─ Cinnamon 2D (software rendering)              │
 │  ├─ Marco (window manager)                         │
 │  ├─ Mate-panel (panel)                            │

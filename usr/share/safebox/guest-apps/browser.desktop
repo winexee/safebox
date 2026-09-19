@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Web Tarayıcısı
+GenericName=Web Browser
+Comment=Güvenli web tarayıcısı
+Exec=firefox %u
+Icon=firefox
+Terminal=false
+Categories=Network;WebBrowser;
+StartupNotify=true

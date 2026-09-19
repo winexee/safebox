@@ -15,20 +15,17 @@ Depends: ${misc:Depends},
          python3,
          python3-gi,
          gir1.2-gtk-3.0,
-         xfwm4,
-         xfdesktop4,
-         thunar,
-         mousepad,
-         xfce4-terminal,
-         mate-system-monitor,
-         tint2,
-         rofi,
-         epiphany-browser,
-         feh,
-         hsetroot,
+         cinnamon-core,
+         cinnamon-session,
+         nemo,
+         xed,
+         gnome-terminal,
+         gnome-system-monitor,
+         firefox,
          yaru-theme-icon,
          yaru-theme-gtk
-Description: Guvenli ve tam izole sanal masaustu ortami
- SafeBox; Bubblewrap, XFCE4 ve Xephyr altyapisini birlestirerek 
- tam donanim izolasyonlu (CPU/RAM/Hostname/Passwd) ve izole 
- bir masaustu ortami sunar.
+Recommends: debootstrap
+Description: Güvenli ve tam izole sanal masaüstü ortamı
+ SafeBox; Bubblewrap, Cinnamon ve Xephyr altyapısını birleştirerek 
+ tam donanım izolasyonlu (CPU/RAM/Hostname/Passwd) ve izole 
+ bir masaüstü ortamı sunar.

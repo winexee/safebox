@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Sistem İzleme
+GenericName=System Monitor
+Comment=Sistem kaynaklarını izleyin
+Exec=gnome-system-monitor
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Monitor;
+StartupNotify=true

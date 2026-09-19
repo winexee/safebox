@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Metin Düzenleyici
+GenericName=Text Editor
+Comment=Metin dosyalarını düzenleyin
+Exec=xed %U
+Icon=accessories-text-editor
+Terminal=false
+Categories=Utility;TextEditor;
+StartupNotify=true

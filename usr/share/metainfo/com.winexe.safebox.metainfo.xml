@@ -2,13 +2,13 @@
 <component type="desktop-application">
   <id>safebox.desktop</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-3.0+</project_license>
+  <project_license>MIT</project_license>
   <name>SafeBox</name>
-  <summary>Izole ve Guvenli Sanal Alan Ortami</summary>
+  <summary>İzole ve Güvenli Sanal Alan Ortamı</summary>
   <description>
     <p>
-      SafeBox, bubblewrap ve XFCE altyapisini kullanarak sistem dosyalarini 
-      ve kisisel verileri tamamen izole eden tek kullanimlik guvenli bir sandbox ortami sunar.
+      SafeBox, Bubblewrap ve Cinnamon altyapısını kullanarak sistem dosyalarını 
+      ve kişisel verileri tamamen izole eden tek kullanımlık güvenli bir sandbox ortamı sunar.
     </p>
   </description>
   <launchable type="desktop-id">safebox.desktop</launchable>
