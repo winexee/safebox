@@ -238,35 +238,32 @@ class SafeBoxGUI(Gtk.Window):
             
             # Test 2: SafeBox-Core Çalışıyor mu?
             tests_total += 1
-            pid_file = "/tmp/safebox-core.pid"
-            core_pid = None
-            if os.path.exists(pid_file):
-                try:
-                    with open(pid_file, "r") as f:
-                        core_pid = f.read().strip()
-                    # PID hala hayatta mı ve safebox-core mu?
-                    result = subprocess.run(["ps", "-p", core_pid, "-o", "comm="], capture_output=True, text=True)
-                    if "safebox-core" in result.stdout:
-                        self.append_log(f"✓ Arka Plan Süreci: safebox-core aktif (PID: {core_pid})")
-                        tests_passed += 1
-                        
-                        # Test 3: Cgroup Limiti (Gerçek Sandbox Kapsamı)
-                        tests_total += 1
-                        try:
-                            cgroup_path = subprocess.run(["cat", f"/proc/{core_pid}/cgroup"], capture_output=True, text=True, timeout=2).stdout
-                            if "safebox-app.scope" in cgroup_path:
-                                self.append_log("✓ Kaynak Sınırları: Süreç başarıyla izole edilmiş Cgroup içinde çalışıyor (safebox-app.scope)")
-                                tests_passed += 1
-                            else:
-                                self.append_log(f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})")
-                        except Exception as e:
-                            self.append_log(f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})")
-                    else:
-                        self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
-                except Exception as e:
-                    self.append_log(f"✗ Arka Plan Kontrolü: {e}")
-            else:
-                self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
+            # Önce systemd scope'u kontrol et
+            try:
+                unit_pid_res = subprocess.run(["systemctl", "--user", "show", "safebox-app.scope", "--property=MainPID"], capture_output=True, text=True, timeout=2)
+                sandbox_pid = None
+                if "MainPID=" in unit_pid_res.stdout:
+                    sandbox_pid = unit_pid_res.stdout.split("=")[1].strip()
+                
+                if sandbox_pid and sandbox_pid != "0":
+                    self.append_log(f"✓ Arka Plan Süreci: safebox-app.scope aktif (MainPID: {sandbox_pid})")
+                    tests_passed += 1
+                    
+                    # Test 3: Cgroup Limiti (Gerçek Sandbox Kapsamı)
+                    tests_total += 1
+                    try:
+                        cgroup_path = subprocess.run(["cat", f"/proc/{sandbox_pid}/cgroup"], capture_output=True, text=True, timeout=2).stdout
+                        if "safebox-app.scope" in cgroup_path:
+                            self.append_log("✓ Kaynak Sınırları: Süreç başarıyla izole edilmiş Cgroup içinde çalışıyor (safebox-app.scope)")
+                            tests_passed += 1
+                        else:
+                            self.append_log(f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})")
+                    except Exception as e:
+                        self.append_log(f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})")
+                else:
+                    self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
+            except Exception as e:
+                self.append_log(f"✗ Arka Plan Kontrolü: {e}")
             
             # Sonuç
             if tests_total > 0:

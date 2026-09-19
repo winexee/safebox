@@ -33,13 +33,20 @@ if [ -f "$ROOTFS_DIR/.safebox-rootfs-complete" ]; then
         print_info "Kurulum iptal edildi."
         exit 0
     fi
-    print_info "Mevcut rootfs siliniyor..."
+    print_info "Mevcut rootfs yedekleniyor (.old)..."
+    rm -rf "${ROOTFS_DIR}.old"
+    mv "$ROOTFS_DIR" "${ROOTFS_DIR}.old"
+elif [ -d "$ROOTFS_DIR" ]; then
+    print_info "Tamamlanmamış rootfs bulundu, temizleniyor..."
     rm -rf "$ROOTFS_DIR"
 fi
 
 # Yarım kalmış bir geçici klasör varsa sil
 ROOTFS_TMP="${ROOTFS_DIR}.tmp"
 rm -rf "$ROOTFS_TMP"
+
+# Hata yakalama: Hata olursa yedeği geri yükle
+trap 'if [ -d "${ROOTFS_DIR}.old" ] && [ ! -d "$ROOTFS_DIR" ]; then print_warn "Kurulum başarısız, eski rootfs geri yükleniyor..."; mv "${ROOTFS_DIR}.old" "$ROOTFS_DIR"; fi; exit 1' ERR INT TERM
 
 # Bağımlılıkları kontrol et
 print_info "Bağımlılıklar kontrol ediliyor..."
@@ -104,8 +111,13 @@ print_ok "Temizlik tamamlandı."
 # Kurulumun tamamlandığını belirten bayrak dosyasını ekle
 touch "$ROOTFS_TMP/.safebox-rootfs-complete"
 
+# Hata tuzağını kaldır
+trap - ERR INT TERM
+
 # Atomik olarak taşı
+rm -rf "$ROOTFS_DIR"
 mv "$ROOTFS_TMP" "$ROOTFS_DIR"
+rm -rf "${ROOTFS_DIR}.old"
 
 # Boyut bilgisi
 ROOTFS_SIZE=$(du -sh "$ROOTFS_DIR" 2>/dev/null | cut -f1)
