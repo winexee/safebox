@@ -91,11 +91,15 @@ Konsol sekmesinden "doctor" komutunu çalıştırdığınızda şu gerçek zaman
 
 ---
 
-## 🛡️ Güvenlik Mimarisi ve Sınırlar
+## 🛡️ Güvenlik Mimarisi ve İzolasyon Sınırları (Tavizler)
 
-- **Loglama:** SafeBox içindeki işlemler RAM'de tutulur, ancak başlangıç ve hatalara ait süreç logları (engine log) ana sisteminizde `~/.local/share/safebox/` altında saklanır.
-- **RootFS (Dosya Sistemi):** Kendi özel RootFS'i olduğu için ana sisteminizdeki kişisel dosyalarınıza (`/home`) ve sistem yapılandırmalarınıza (`/etc`, `/usr`) erişim yoktur.
-- **GPU Erişimi:** Performanslı bir masaüstü deneyimi sunmak için `/dev/dri` düğümleri içeri aktarılır. Bu durum GPU tabanlı kaçış (escape) açıklarına karşı risk oluşturabilir. Tam güvenlik isteniyorsa kaynak koddan `dev-bind` kısımları çıkarılmalıdır.
+SafeBox, kullanım kolaylığı ve performans sağlamak amacıyla bazı katı sanallaştırma prensiplerinden bilinçli olarak taviz verir. Lütfen aşağıdaki güvenlik sınırlarını dikkate alın:
+
+- **Çekirdek (Kernel) Paylaşımı:** Sistem ayrı bir çekirdek (VM) kullanmaz. `uname -r` host bilgisini gösterir. Ana sisteminizde çekirdek tabanlı (Kernel Exploit) bir zafiyet varsa SafeBox sizi koruyamaz.
+- **Seccomp Filtrelemesi Eksikliği:** Bubblewrap üzerinden özel bir BPF Syscall (Sistem Çağrısı) filtrelemesi yapılmaz.
+- **GPU Sızıntı Riski:** Tam donanım ivmelendirmesi sağlamak için `/dev/dri` ve NVIDIA düğümleri sandbox içerisine bağlanır. Zararlı bir kod GPU sürücüsü üzerinden host sisteme erişim (escape) deneyebilir.
+- **Ses Soketleri:** PulseAudio ve PipeWire doğrudan ana sistemden bağlanır. İzole edilmemiş ses soketleri teknik olarak host mikrofona dinleme yapma veya ses dinleme zafiyetlerine açıktır.
+- **Loglama:** SafeBox içindeki işlemler RAM'de tutulur, ancak hata logları ana sisteminizde `~/.local/share/safebox/safebox-engine.log` altında kalır.
 - **İç İçe Sandbox (Nested):** Güvenlik gereği SafeBox içerisinden tekrar SafeBox veya farklı bir sandbox çalıştırılması engellenmiştir.
 
 ---

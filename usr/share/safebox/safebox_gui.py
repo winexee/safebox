@@ -230,32 +230,40 @@ class SafeBoxGUI(Gtk.Window):
             
             # Test 1: RootFS kontrolü
             tests_total += 1
-            if os.path.isdir("/var/lib/safebox/rootfs/usr") and os.path.isdir("/var/lib/safebox/rootfs/bin"):
-                self.append_log("✓ RootFS: Kurulu ve hazır")
+            if os.path.exists("/var/lib/safebox/rootfs/.safebox-rootfs-complete"):
+                self.append_log("✓ RootFS: Tam ve eksiksiz kurulu (.safebox-rootfs-complete)")
                 tests_passed += 1
             else:
-                self.append_log("✗ RootFS: Eksik veya bozuk (sudo safebox-setup gerekli)")
+                self.append_log("✗ RootFS: Eksik veya hatalı kurulum (sudo safebox-setup gerekli)")
             
             # Test 2: SafeBox-Core Çalışıyor mu?
             tests_total += 1
-            try:
-                result = subprocess.run(["pgrep", "-f", "safebox-core"], capture_output=True, text=True, timeout=2)
-                if result.returncode == 0:
-                    self.append_log("✓ Arka Plan Süreci: safebox-core aktif")
-                    tests_passed += 1
-                    
-                    # Test 3: Cgroup Limiti (Sadece safebox-core çalışıyorsa anlamlı)
-                    tests_total += 1
-                    cgroup_res = subprocess.run(["systemctl", "--user", "show", "run-*.scope", "--property=MemoryMax,CPUQuota"], capture_output=True, text=True, timeout=2)
-                    if "MemoryMax=" in cgroup_res.stdout or "CPUQuota=" in cgroup_res.stdout:
-                        self.append_log("✓ Kaynak Sınırları: Cgroup v2 limitleri aktif")
+            pid_file = "/tmp/safebox-core.pid"
+            core_pid = None
+            if os.path.exists(pid_file):
+                try:
+                    with open(pid_file, "r") as f:
+                        core_pid = f.read().strip()
+                    # PID hala hayatta mı ve safebox-core mu?
+                    result = subprocess.run(["ps", "-p", core_pid, "-o", "comm="], capture_output=True, text=True)
+                    if "safebox-core" in result.stdout:
+                        self.append_log(f"✓ Arka Plan Süreci: safebox-core aktif (PID: {core_pid})")
                         tests_passed += 1
+                        
+                        # Test 3: Cgroup Limiti
+                        tests_total += 1
+                        cgroup_res = subprocess.run(["systemctl", "--user", "show", "safebox-app.scope", "--property=MemoryMax,CPUQuota"], capture_output=True, text=True, timeout=2)
+                        if "MemoryMax=" in cgroup_res.stdout and "infinity" not in cgroup_res.stdout:
+                            self.append_log("✓ Kaynak Sınırları: safebox-app.scope aktif ve limitli")
+                            tests_passed += 1
+                        else:
+                            self.append_log("⚠ Kaynak Sınırları: safebox-app.scope saptanamadı veya limitsiz")
                     else:
-                        self.append_log("⚠ Kaynak Sınırları: Cgroup kısıtlamaları saptanamadı")
-                else:
-                    self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
-            except Exception as e:
-                self.append_log(f"✗ Arka Plan Kontrolü: {e}")
+                        self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
+                except Exception as e:
+                    self.append_log(f"✗ Arka Plan Kontrolü: {e}")
+            else:
+                self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
             
             # Sonuç
             if tests_total > 0:

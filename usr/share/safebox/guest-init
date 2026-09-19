@@ -37,15 +37,5 @@ done
 
 echo "[BİLGİ] Masaüstü hazırlandı"
 
-# Cinnamon Masaüstünü 2D Modunda Güvenle Başlat
-if which cinnamon2d >/dev/null 2>&1; then
-    exec cinnamon2d
-elif which cinnamon-session >/dev/null 2>&1; then
-    exec cinnamon-session --session=cinnamon2d
-else
-    # Fallback
-    xfwm4 &
-    pcmanfm --desktop &
-    tint2 &
-    wait
-fi
+# Cinnamon oturumu başlat (Debian rootfs içinden)
+exec cinnamon-session

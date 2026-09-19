@@ -25,3 +25,23 @@
 
 ### 7. README ve Dokümantasyon
 **Çözüm:** README dosyası baştan yazılarak iddialar gerçekçi seviyelere çekildi. Loglama kalıntıları ve sistem mimarisi şeffaf bir şekilde eklendi.
+
+## ✅ DÜZELTİLDİ — İleri Düzey Güvenlik ve Mimari (Madde 1-14)
+
+### 8. Atomik RootFS Kurulumu
+**Çözüm:** `safebox-setup` geçici bir dizine kurulum yapıp son aşamada taşıyor. Kesintiye karşı yarı kurulu sistemler engellendi. Geri bildirim dosyası `.safebox-rootfs-complete` eklendi.
+
+### 9. Çoklu Oturum Çakışması (Race Condition)
+**Çözüm:** `safebox-core` çalışırken `/tmp/safebox.lock` kullanılarak `flock` (file lock) uygulandı. İkinci bir başlatma reddediliyor.
+
+### 10. Kesin Doctor Testi
+**Çözüm:** Doctor komutu artık belirsiz bir pgrep araması yerine, doğrudan özel `safebox-core.pid` dosyasını kontrol ediyor. Cgroup testi ise sadece `--unit=safebox-app.scope` arayarak spesifikleştirildi.
+
+### 11. Güvenlik İtirafları (Ses, Seccomp, Kernel)
+**Çözüm:** README dosyasına ses soketinin host mikrofonuna erişebileceği, seccomp eksikliği ve Kernel sürümü paylaşımı açıkça eklendi. 
+
+### 12. Fallback Mantığının Silinmesi
+**Çözüm:** `guest-init` içindeki asla çalışmayacak olan xfwm4/tint2 kodları silindi.
+
+### 13. Paket Açıklama Düzeltmeleri
+**Çözüm:** `debian/control` ve `metainfo.xml` dosyalarındaki abartılı "tam donanım izolasyonlu" iddiaları, "namespace tabanlı izole konteyner" olarak revize edildi.

@@ -26,8 +26,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # Zaten kurulu mu kontrol et
-if [ -d "$ROOTFS_DIR/usr" ] && [ -d "$ROOTFS_DIR/bin" ]; then
-    print_warn "RootFS zaten mevcut: $ROOTFS_DIR"
+if [ -f "$ROOTFS_DIR/.safebox-rootfs-complete" ]; then
+    print_warn "RootFS zaten mevcut ve tam: $ROOTFS_DIR"
     read -rp "Yeniden oluşturmak istiyor musunuz? [e/H]: " choice
     if [[ ! "$choice" =~ ^[eEyY]$ ]]; then
         print_info "Kurulum iptal edildi."
@@ -36,6 +36,10 @@ if [ -d "$ROOTFS_DIR/usr" ] && [ -d "$ROOTFS_DIR/bin" ]; then
     print_info "Mevcut rootfs siliniyor..."
     rm -rf "$ROOTFS_DIR"
 fi
+
+# Yarım kalmış bir geçici klasör varsa sil
+ROOTFS_TMP="${ROOTFS_DIR}.tmp"
+rm -rf "$ROOTFS_TMP"
 
 # Bağımlılıkları kontrol et
 print_info "Bağımlılıklar kontrol ediliyor..."
@@ -66,20 +70,20 @@ print_ok "Bağımlılıklar hazır."
 
 # RootFS oluştur
 print_info "RootFS oluşturuluyor (bu işlem birkaç dakika sürebilir)..."
-mkdir -p "$ROOTFS_DIR"
+mkdir -p "$ROOTFS_TMP"
 
 debootstrap \
     --variant=minbase \
     --include=cinnamon-core,cinnamon-session,nemo,xed,gnome-terminal,firefox,gnome-system-monitor,dbus-x11,locales,fonts-noto,fonts-noto-color-emoji,adwaita-icon-theme \
     "$DISTRO" \
-    "$ROOTFS_DIR" \
+    "$ROOTFS_TMP" \
     http://archive.ubuntu.com/ubuntu
 
 print_ok "Temel sistem oluşturuldu."
 
 # Locale ayarla
 print_info "Türkçe dil desteği ayarlanıyor..."
-chroot "$ROOTFS_DIR" /bin/bash -c "
+chroot "$ROOTFS_TMP" /bin/bash -c "
     sed -i 's/# tr_TR.UTF-8 UTF-8/tr_TR.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || true
     locale-gen tr_TR.UTF-8 2>/dev/null || true
 "
@@ -87,7 +91,7 @@ print_ok "Dil desteği ayarlandı."
 
 # Gereksiz dosyaları temizle (boyutu küçült)
 print_info "Gereksiz dosyalar temizleniyor..."
-chroot "$ROOTFS_DIR" /bin/bash -c "
+chroot "$ROOTFS_TMP" /bin/bash -c "
     apt-get clean
     rm -rf /var/lib/apt/lists/*
     rm -rf /usr/share/doc/*
@@ -96,6 +100,12 @@ chroot "$ROOTFS_DIR" /bin/bash -c "
     rm -rf /tmp/*
 "
 print_ok "Temizlik tamamlandı."
+
+# Kurulumun tamamlandığını belirten bayrak dosyasını ekle
+touch "$ROOTFS_TMP/.safebox-rootfs-complete"
+
+# Atomik olarak taşı
+mv "$ROOTFS_TMP" "$ROOTFS_DIR"
 
 # Boyut bilgisi
 ROOTFS_SIZE=$(du -sh "$ROOTFS_DIR" 2>/dev/null | cut -f1)

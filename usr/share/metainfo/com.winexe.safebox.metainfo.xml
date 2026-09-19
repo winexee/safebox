@@ -4,11 +4,11 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>SafeBox</name>
-  <summary>İzole ve Güvenli Sanal Alan Ortamı</summary>
+  <summary>Namespace Tabanlı İzole Konteyner Ortamı</summary>
   <description>
     <p>
       SafeBox, Bubblewrap ve Cinnamon altyapısını kullanarak sistem dosyalarını 
-      ve kişisel verileri tamamen izole eden tek kullanımlık güvenli bir sandbox ortamı sunar.
+      ve kişisel verileri ayrıştıran tek kullanımlık bir konteyner (namespace) sandbox ortamı sunar.
     </p>
   </description>
   <launchable type="desktop-id">safebox.desktop</launchable>

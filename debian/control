@@ -26,7 +26,6 @@ Depends: ${misc:Depends},
          yaru-theme-gtk,
          policykit-1
 Recommends: debootstrap
-Description: Güvenli ve tam izole sanal masaüstü ortamı
+Description: Namespace tabanlı izole konteyner masaüstü ortamı
  SafeBox; Bubblewrap, Cinnamon ve Xephyr altyapısını birleştirerek 
- tam donanım izolasyonlu (CPU/RAM/Hostname/Passwd) ve izole 
- bir masaüstü ortamı sunar.
+ konteyner (namespace) izolasyonlu bir sanal masaüstü ortamı sunar.
