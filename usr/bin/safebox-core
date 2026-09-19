@@ -6,10 +6,16 @@ RAM_GB="${1:-4}"
 CPU_CORES="${2:-4}"
 RESOLUTION="${3:-1366x768}"
 SHARE_FOLDER="${4:-1}"
-AUDIO="${5:-1}"
+AUDIO="${5:-0}"
 NET="${6:-1}"
+GPU="${7:-0}"
 
 ROOTFS="/var/lib/safebox/rootfs"
+ROOTFS_MARKER="$ROOTFS/.safebox-rootfs-complete"
+ROOTFS_MARKER_VERSION="2"
+CORE_PID_FILE="/tmp/safebox-core.pid"
+SANDBOX_PID_FILE="/tmp/safebox-sandbox.pid"
+SESSION_MODE_FILE="/tmp/safebox-session.mode"
 
 LOG_DIR="${HOME}/.local/share/safebox"
 PROC_MOCK_DIR="${LOG_DIR}/mock_proc"
@@ -18,8 +24,35 @@ ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
 mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu" "$ETC_MOCK_DIR"
 
-if [ ! -f "$ROOTFS/.safebox-rootfs-complete" ]; then
-    echo "[HATA] RootFS eksik veya tam kurulmamış: $ROOTFS" >> "$ENGINE_LOG"
+validate_rootfs() {
+    local required=(
+        "$ROOTFS/usr/bin/cinnamon-session"
+        "$ROOTFS/usr/bin/firefox"
+        "$ROOTFS/usr/bin/gnome-terminal"
+        "$ROOTFS/etc/os-release"
+        "$ROOTFS/bin/bash"
+    )
+    local marker_version
+
+    if [ ! -f "$ROOTFS_MARKER" ]; then
+        return 1
+    fi
+
+    for item in "${required[@]}"; do
+        if [ ! -e "$item" ]; then
+            return 1
+        fi
+    done
+
+    marker_version=$(awk -F= '$1=="format_version" {print $2}' "$ROOTFS_MARKER" 2>/dev/null || true)
+    if [ -n "$marker_version" ] && [ "$marker_version" != "$ROOTFS_MARKER_VERSION" ]; then
+        return 1
+    fi
+    return 0
+}
+
+if ! validate_rootfs; then
+    echo "[HATA] RootFS eksik, yarım veya doğrulama başarısız: $ROOTFS" >> "$ENGINE_LOG"
     exit 105
 fi
 
@@ -32,7 +65,8 @@ if ! flock -n 9; then
 fi
 
 # Doctor testi için PID kaydet
-echo $$ > "/tmp/safebox-core.pid"
+echo $$ > "$CORE_PID_FILE"
+rm -f "$SANDBOX_PID_FILE" "$SESSION_MODE_FILE"
 
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.6 Başlatılıyor ===" > "$ENGINE_LOG"
 
@@ -128,6 +162,7 @@ fi
 
 cleanup() {
     echo "[BİLGİ] Oturum kapatılıyor..." >> "$ENGINE_LOG"
+    rm -f "$SANDBOX_PID_FILE" "$SESSION_MODE_FILE" "$CORE_PID_FILE" 2>/dev/null || true
     kill -9 "$XEPHYR_PID" 2>/dev/null || true
     # X11 Lock dosyasını temizle
     rm -f "/tmp/.X${TARGET_DISP#:}-lock" 2>/dev/null || true
@@ -233,14 +268,19 @@ BWRAP_ARGS=(
     --new-session
 )
 
-# Kontrollü /dev/dri Düğümleri
-if [ -e /dev/dri/renderD128 ]; then BWRAP_ARGS+=(--dev-bind /dev/dri/renderD128 /dev/dri/renderD128); fi
-if [ -e /dev/dri/card0 ]; then BWRAP_ARGS+=(--dev-bind /dev/dri/card0 /dev/dri/card0); fi
+if [ "$GPU" = "1" ]; then
+    echo "[UYARI] GPU/NVIDIA cihaz erişimi etkinleştirildi. Bu izolasyonu zayıflatabilir." >> "$ENGINE_LOG"
+    # Kontrollü /dev/dri Düğümleri
+    if [ -e /dev/dri/renderD128 ]; then BWRAP_ARGS+=(--dev-bind /dev/dri/renderD128 /dev/dri/renderD128); fi
+    if [ -e /dev/dri/card0 ]; then BWRAP_ARGS+=(--dev-bind /dev/dri/card0 /dev/dri/card0); fi
 
-# Kontrollü NVIDIA Düğümleri
-for nv_node in /dev/nvidia0 /dev/nvidiactl /dev/nvidia-modeset /dev/nvidia-uvm; do
-    if [ -e "$nv_node" ]; then BWRAP_ARGS+=(--dev-bind "$nv_node" "$nv_node"); fi
-done
+    # Kontrollü NVIDIA Düğümleri
+    for nv_node in /dev/nvidia0 /dev/nvidiactl /dev/nvidia-modeset /dev/nvidia-uvm; do
+        if [ -e "$nv_node" ]; then BWRAP_ARGS+=(--dev-bind "$nv_node" "$nv_node"); fi
+    done
+else
+    echo "[BİLGİ] GPU/NVIDIA cihaz erişimi varsayılan olarak kapalı." >> "$ENGINE_LOG"
+fi
 
 # Ağ - İzole Namespace (Network Isolation)
 if [ "$NET" = "1" ]; then
@@ -271,6 +311,8 @@ if [ "$AUDIO" = "1" ]; then
     else
         echo "[UYARI] Aktif bir ses soketi bulunamadı!" >> "$ENGINE_LOG"
     fi
+else
+    echo "[BİLGİ] Ses soketi paylaşımı varsayılan olarak kapalı." >> "$ENGINE_LOG"
 fi
 
 # Paylaşım Klasörü
@@ -292,13 +334,18 @@ echo "[BİLGİ] Sandbox başlatılıyor..." >> "$ENGINE_LOG"
 CPU_QUOTA_VAL=$((CPU_CORES * 100))
 
 if which systemd-run >/dev/null 2>&1; then
-    taskset -c "$CPU_AFFINITY" systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || {
+    echo "scope" > "$SESSION_MODE_FILE"
+    taskset -c "$CPU_AFFINITY" systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bash -c 'echo "$$" > "$1"; shift; exec "$@"' _ "$SANDBOX_PID_FILE" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || {
         echo "[HATA] Sandbox başlatılamadı! systemd-run veya bwrap hatası." >> "$ENGINE_LOG"
         kill $XEPHYR_PID 2>/dev/null
         exit 107
     }
 else
-    taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || {
+    echo "legacy" > "$SESSION_MODE_FILE"
+    taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 &
+    SANDBOX_PID=$!
+    echo "$SANDBOX_PID" > "$SANDBOX_PID_FILE"
+    wait "$SANDBOX_PID" || {
         echo "[HATA] Sandbox başlatılamadı! bwrap hatası." >> "$ENGINE_LOG"
         kill $XEPHYR_PID 2>/dev/null
         exit 107

@@ -5,7 +5,11 @@
 set -euo pipefail
 
 ROOTFS_DIR="/var/lib/safebox/rootfs"
+ROOTFS_TMP="${ROOTFS_DIR}.tmp"
+ROOTFS_BACKUP="${ROOTFS_DIR}.backup"
 DISTRO="noble"  # Ubuntu 24.04 LTS
+ROOTFS_MARKER=".safebox-rootfs-complete"
+ROOTFS_MARKER_VERSION="2"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,6 +22,43 @@ print_ok()    { echo -e "${GREEN}[  OK ]${NC} $1"; }
 print_warn()  { echo -e "${YELLOW}[UYARI]${NC} $1"; }
 print_error() { echo -e "${RED}[HATA]${NC} $1"; }
 
+cleanup_tmp() {
+    rm -rf "$ROOTFS_TMP"
+}
+
+validate_rootfs_tree() {
+    local root="$1"
+    local marker_file="$root/$ROOTFS_MARKER"
+    local marker_version=""
+    local required=(
+        "$root/usr/bin/cinnamon-session"
+        "$root/usr/bin/firefox"
+        "$root/usr/bin/gnome-terminal"
+        "$root/etc/os-release"
+        "$root/bin/bash"
+    )
+
+    for req in "${required[@]}"; do
+        if [ ! -e "$req" ]; then
+            print_error "RootFS doğrulaması başarısız: Eksik dosya -> $req"
+            return 1
+        fi
+    done
+
+    if [ ! -f "$marker_file" ]; then
+        print_error "RootFS doğrulaması başarısız: Marker dosyası yok -> $marker_file"
+        return 1
+    fi
+
+    marker_version=$(awk -F= '$1=="format_version" {print $2}' "$marker_file" 2>/dev/null || true)
+    if [ -n "$marker_version" ] && [ "$marker_version" != "$ROOTFS_MARKER_VERSION" ]; then
+        print_error "RootFS doğrulaması başarısız: Desteklenmeyen marker sürümü -> $marker_version"
+        return 1
+    fi
+
+    return 0
+}
+
 # Root kontrolü
 if [ "$(id -u)" -ne 0 ]; then
     print_error "Bu betik root yetkisi gerektirir!"
@@ -25,21 +66,29 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# RootFS taşıma sonrası yarım kalmış backup kurtarma
+if [ -d "$ROOTFS_BACKUP" ] && [ ! -d "$ROOTFS_DIR" ]; then
+    print_warn "Önceki kurulumdan kalan backup bulundu, geri yükleniyor..."
+    mv "$ROOTFS_BACKUP" "$ROOTFS_DIR"
+fi
+
 # Zaten kurulu mu kontrol et
-if [ -f "$ROOTFS_DIR/.safebox-rootfs-complete" ]; then
+if [ -f "$ROOTFS_DIR/$ROOTFS_MARKER" ]; then
     print_warn "RootFS zaten mevcut ve tam: $ROOTFS_DIR"
     read -rp "Yeniden oluşturmak istiyor musunuz? [e/H]: " choice
     if [[ ! "$choice" =~ ^[eEyY]$ ]]; then
         print_info "Kurulum iptal edildi."
         exit 0
     fi
-    print_info "Mevcut rootfs siliniyor..."
-    rm -rf "$ROOTFS_DIR"
+fi
+
+if [ -d "$ROOTFS_DIR" ] && [ ! -f "$ROOTFS_DIR/$ROOTFS_MARKER" ]; then
+    print_warn "Marker bulunamadı; mevcut rootfs yarım kurulum olabilir. Başarılı kurulum sonrası atomik olarak değiştirilecek."
 fi
 
 # Yarım kalmış bir geçici klasör varsa sil
-ROOTFS_TMP="${ROOTFS_DIR}.tmp"
 rm -rf "$ROOTFS_TMP"
+trap cleanup_tmp EXIT
 
 # Bağımlılıkları kontrol et
 print_info "Bağımlılıklar kontrol ediliyor..."
@@ -102,10 +151,36 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
 print_ok "Temizlik tamamlandı."
 
 # Kurulumun tamamlandığını belirten bayrak dosyasını ekle
-touch "$ROOTFS_TMP/.safebox-rootfs-complete"
+cat > "$ROOTFS_TMP/$ROOTFS_MARKER" << MARKER_EOF
+format_version=${ROOTFS_MARKER_VERSION}
+distro=${DISTRO}
+created_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+MARKER_EOF
 
-# Atomik olarak taşı
-mv "$ROOTFS_TMP" "$ROOTFS_DIR"
+print_info "RootFS doğrulanıyor..."
+validate_rootfs_tree "$ROOTFS_TMP"
+print_ok "RootFS doğrulaması başarılı."
+
+if [ -d "$ROOTFS_BACKUP" ]; then
+    print_warn "Eski backup dizini temizleniyor: $ROOTFS_BACKUP"
+    rm -rf "$ROOTFS_BACKUP"
+fi
+
+# Atomik yer değiştirme: eski rootfs'i önce backup'a taşı, yeni rootfs hazırsa değiştir.
+if [ -d "$ROOTFS_DIR" ]; then
+    mv "$ROOTFS_DIR" "$ROOTFS_BACKUP"
+fi
+
+if mv "$ROOTFS_TMP" "$ROOTFS_DIR"; then
+    rm -rf "$ROOTFS_BACKUP"
+else
+    print_error "Yeni RootFS devreye alınamadı, rollback başlatılıyor..."
+    rm -rf "$ROOTFS_DIR"
+    if [ -d "$ROOTFS_BACKUP" ]; then
+        mv "$ROOTFS_BACKUP" "$ROOTFS_DIR"
+    fi
+    exit 1
+fi
 
 # Boyut bilgisi
 ROOTFS_SIZE=$(du -sh "$ROOTFS_DIR" 2>/dev/null | cut -f1)

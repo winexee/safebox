@@ -121,13 +121,16 @@ class SafeBoxGUI(Gtk.Window):
 
         self.chk_net = Gtk.CheckButton(label="İnternet ve Ağ Erişimi (Ana sistem ağı paylaşılır)")
         self.chk_net.set_active(True)
-        self.chk_audio = Gtk.CheckButton(label="Ses Desteği (PulseAudio / PipeWire Soketi)")
-        self.chk_audio.set_active(True)
+        self.chk_audio = Gtk.CheckButton(label="Ses Desteği (Host ses soketi paylaşımı - Opt-in)")
+        self.chk_audio.set_active(False)
+        self.chk_gpu = Gtk.CheckButton(label="GPU/NVIDIA Desteği (Host cihaz erişimi - Opt-in)")
+        self.chk_gpu.set_active(False)
         self.chk_share = Gtk.CheckButton(label="Paylaşılan Klasör (~/SafeBox-Paylasim Köprüsü)")
         self.chk_share.set_active(True)
 
         tab_perms.pack_start(self.chk_net, False, False, 0)
         tab_perms.pack_start(self.chk_audio, False, False, 0)
+        tab_perms.pack_start(self.chk_gpu, False, False, 0)
         tab_perms.pack_start(self.chk_share, False, False, 0)
         notebook.append_page(tab_perms, Gtk.Label(label="İzinler ve İzolasyon"))
 
@@ -239,7 +242,17 @@ class SafeBoxGUI(Gtk.Window):
             # Test 2: SafeBox-Core Çalışıyor mu?
             tests_total += 1
             pid_file = "/tmp/safebox-core.pid"
+            sandbox_pid_file = "/tmp/safebox-sandbox.pid"
+            session_mode_file = "/tmp/safebox-session.mode"
             core_pid = None
+            sandbox_pid = None
+            run_mode = "unknown"
+            if os.path.exists(session_mode_file):
+                try:
+                    with open(session_mode_file, "r", encoding="utf-8") as f:
+                        run_mode = f.read().strip() or "unknown"
+                except Exception:
+                    run_mode = "unknown"
             if os.path.exists(pid_file):
                 try:
                     with open(pid_file, "r") as f:
@@ -249,18 +262,40 @@ class SafeBoxGUI(Gtk.Window):
                     if "safebox-core" in result.stdout:
                         self.append_log(f"✓ Arka Plan Süreci: safebox-core aktif (PID: {core_pid})")
                         tests_passed += 1
-                        
-                        # Test 3: Cgroup Limiti (Gerçek Sandbox Kapsamı)
+
+                        # Test 3: Gerçek sandbox payload PID doğrulaması
                         tests_total += 1
-                        try:
-                            cgroup_path = subprocess.run(["cat", f"/proc/{core_pid}/cgroup"], capture_output=True, text=True, timeout=2).stdout
-                            if "safebox-app.scope" in cgroup_path:
-                                self.append_log("✓ Kaynak Sınırları: Süreç başarıyla izole edilmiş Cgroup içinde çalışıyor (safebox-app.scope)")
+                        if os.path.exists(sandbox_pid_file):
+                            with open(sandbox_pid_file, "r", encoding="utf-8") as f:
+                                sandbox_pid = f.read().strip()
+                            payload_result = subprocess.run(["ps", "-p", sandbox_pid, "-o", "comm="], capture_output=True, text=True)
+                            if payload_result.stdout.strip():
+                                self.append_log(f"✓ Sandbox Payload: PID bulundu ({sandbox_pid}, süreç: {payload_result.stdout.strip()})")
                                 tests_passed += 1
                             else:
-                                self.append_log(f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})")
-                        except Exception as e:
-                            self.append_log(f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})")
+                                self.append_log("✗ Sandbox Payload: PID dosyası var ancak süreç aktif değil")
+                        else:
+                            self.append_log("✗ Sandbox Payload: PID dosyası bulunamadı")
+
+                        # Test 4: Cgroup Limiti (Gerçek Sandbox Payload Kapsamı)
+                        tests_total += 1
+                        if run_mode == "scope":
+                            if sandbox_pid:
+                                try:
+                                    cgroup_path = subprocess.run(["cat", f"/proc/{sandbox_pid}/cgroup"], capture_output=True, text=True, timeout=2).stdout
+                                    if "safebox-app.scope" in cgroup_path:
+                                        self.append_log("✓ Kaynak Sınırları: Gerçek sandbox payload safebox-app.scope içinde")
+                                        tests_passed += 1
+                                    else:
+                                        self.append_log(f"⚠ Kaynak Sınırları: Payload cgroup beklenen scope içinde değil ({cgroup_path.strip()})")
+                                except Exception as e:
+                                    self.append_log(f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})")
+                            else:
+                                self.append_log("✗ Kaynak Sınırları: Payload PID doğrulanamadığı için cgroup testi yapılamadı")
+                        elif run_mode == "legacy":
+                            self.append_log("ℹ Kaynak Sınırları: systemd-run desteklenmediği için scope tabanlı cgroup doğrulaması atlandı")
+                        else:
+                            self.append_log("ℹ Kaynak Sınırları: Oturum modu bilinmiyor, cgroup doğrulaması sınırlı")
                     else:
                         self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
                 except Exception as e:
@@ -307,17 +342,18 @@ class SafeBoxGUI(Gtk.Window):
         res = self.res_combo.get_active_text()
         net = "1" if self.chk_net.get_active() else "0"
         audio = "1" if self.chk_audio.get_active() else "0"
+        gpu = "1" if self.chk_gpu.get_active() else "0"
         share = "1" if self.chk_share.get_active() else "0"
 
         self.btn_start.set_sensitive(False)
-        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}...")
+        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}, Ses={audio}, GPU={gpu}...")
 
         def run_thread():
             engine_path = "/usr/bin/safebox-core"
             if not os.path.exists(engine_path):
                 engine_path = os.path.expanduser("~/safebox/usr/bin/safebox-core")
             
-            cmd = [engine_path, ram, cpu, res, share, audio, net]
+            cmd = [engine_path, ram, cpu, res, share, audio, net, gpu]
             proc = subprocess.run(cmd)
             GLib.idle_add(self.on_sandbox_finished, proc.returncode)
 

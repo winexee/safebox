@@ -8,7 +8,7 @@
 
 SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinmek ve ana sistem dosya yapısını korumak için geliştirilmiş, **Bubblewrap** tabanlı bir **konteyner (namespace)** sanal alanıdır.
 
-> ⚠️ **UYARI - İzolasyon Sınırları:** SafeBox bir "Sanal Makine (VM)" DEĞİLDİR. Tam donanım izolasyonu sağlamaz. Çekirdeği (Kernel) ana sistemle paylaşır. Grafik performansı için `/dev/dri` ve NVIDIA cihazları sandbox içine aktarılır. Bu nedenle izolasyon düzeyi standart bir konteyner sınırları içindedir.
+> ⚠️ **UYARI - İzolasyon Sınırları:** SafeBox bir "Sanal Makine (VM)" DEĞİLDİR. Tam donanım izolasyonu sağlamaz. Çekirdeği (Kernel) ana sistemle paylaşır. Bu, mimari bir sınırdır ve kodla tamamen giderilemez.
 
 ---
 
@@ -80,14 +80,17 @@ safebox
 | **RAM Sınırı** | Cgroup v2 kullanılarak SafeBox süreçlerinin tüketebileceği maksimum RAM miktarı belirlenir. |
 | **CPU Sınırı** | Cgroup v2 kullanılarak işlemci kullanım kotası belirlenir. (Gerçek sanal çekirdek oluşturmaz, sadece kullanım oranını sınırlar) |
 | **İnternet ve Ağ** | Açık: Host ağını kullanır. Kapalı: Ağ namespace'ini izole eder (İnternet kesilir). |
+| **Ses Desteği** | Varsayılan: **Kapalı (opt-in)**. Açıldığında host PulseAudio/PipeWire soketi sandbox içine bağlanır. |
+| **GPU/NVIDIA Desteği** | Varsayılan: **Kapalı (opt-in)**. Açıldığında `/dev/dri` ve NVIDIA cihazları performans için bağlanır, izolasyon zayıflar. |
 | **Paylaşım** | `~/SafeBox-Paylasim` klasörü sandbox içerisine bağlanır. Çift yönlü dosya aktarımı için kullanılır. |
 
 ### Sistem Testi (Doctor)
 
 Konsol sekmesinden "doctor" komutunu çalıştırdığınızda şu gerçek zamanlı kontroller yapılır:
 1. RootFS'in düzgün kurulup kurulmadığı.
-2. Arka planda aktif bir SafeBox sürecinin olup olmadığı.
-3. Cgroup v2 bellek ve işlemci kısıtlamalarının başarıyla uygulanıp uygulanmadığı.
+2. `safebox-core` ve gerçek sandbox payload PID eşleşmesi.
+3. systemd-run destekliyse payload'un `safebox-app.scope` içinde olup olmadığı.
+4. systemd-run olmayan ortamlarda cgroup doğrulamasının neden sınırlı kaldığı.
 
 ---
 
@@ -95,10 +98,10 @@ Konsol sekmesinden "doctor" komutunu çalıştırdığınızda şu gerçek zaman
 
 SafeBox, kullanım kolaylığı ve performans sağlamak amacıyla bazı katı sanallaştırma prensiplerinden bilinçli olarak taviz verir. Lütfen aşağıdaki güvenlik sınırlarını dikkate alın:
 
-- **Çekirdek (Kernel) Paylaşımı:** Sistem ayrı bir çekirdek (VM) kullanmaz. `uname -r` host bilgisini gösterir. Ana sisteminizde çekirdek tabanlı (Kernel Exploit) bir zafiyet varsa SafeBox sizi koruyamaz.
-- **Seccomp Filtrelemesi Eksikliği:** Bubblewrap üzerinden özel bir BPF Syscall (Sistem Çağrısı) filtrelemesi yapılmaz.
-- **GPU Sızıntı Riski:** Tam donanım ivmelendirmesi sağlamak için `/dev/dri` ve NVIDIA düğümleri sandbox içerisine bağlanır. Zararlı bir kod GPU sürücüsü üzerinden host sisteme erişim (escape) deneyebilir.
-- **Ses Soketleri:** PulseAudio ve PipeWire doğrudan ana sistemden bağlanır. İzole edilmemiş ses soketleri teknik olarak host mikrofona dinleme yapma veya ses dinleme zafiyetlerine açıktır.
+- **Çekirdek (Kernel) Paylaşımı:** Sistem ayrı bir çekirdek (VM) kullanmaz. `uname -r` host bilgisini gösterir. Ana sisteminizde çekirdek tabanlı (Kernel Exploit) bir zafiyet varsa SafeBox sizi koruyamaz. Bu mimari sınır, mevcut tasarımda kod değişikliği ile tamamen ortadan kaldırılamaz.
+- **Seccomp Filtrelemesi:** Mevcut mimaride uygulamaya özel güvenli bir syscall allowlist'i verilmemektedir. Kırılgan/eksik seccomp profili üretmek yerine namespace + capability kısıtları ve opt-in cihaz erişimi tercih edilmiştir.
+- **GPU Sızıntı Riski:** GPU/NVIDIA erişimi artık varsayılan kapalıdır; açıldığında `/dev/dri` ve NVIDIA düğümleri sandbox içerisine bağlanır. Bu mod izolasyonu azaltır.
+- **Ses Soketleri:** Ses erişimi artık varsayılan kapalıdır; açıldığında PulseAudio/PipeWire host soketi sandbox'a bağlanır. Bu mod host ses/mikrofon yüzeyini artırır.
 - **Loglama:** SafeBox içindeki işlemler RAM'de tutulur, ancak hata logları ana sisteminizde `~/.local/share/safebox/safebox-engine.log` altında kalır.
 - **İç İçe Sandbox (Nested):** Güvenlik gereği SafeBox içerisinden tekrar SafeBox veya farklı bir sandbox çalıştırılması engellenmiştir.
 
