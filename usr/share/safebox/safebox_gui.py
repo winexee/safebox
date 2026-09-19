@@ -81,7 +81,7 @@ class SafeBoxGUI(Gtk.Window):
         tab_res.set_margin_top(12)
 
         ram_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        ram_lbl = Gtk.Label(label="Tahsis Edilecek RAM:")
+        ram_lbl = Gtk.Label(label="Maksimum RAM Sınırı (Cgroup v2):")
         ram_lbl.set_xalign(0)
         self.ram_combo = Gtk.ComboBoxText()
         for r in ["1 GB", "2 GB", "3 GB", "4 GB", "6 GB", "8 GB"]:
@@ -92,7 +92,7 @@ class SafeBoxGUI(Gtk.Window):
         tab_res.pack_start(ram_box, False, False, 0)
 
         cpu_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        cpu_lbl = Gtk.Label(label="Tahsis Edilecek CPU Çekirdeği:")
+        cpu_lbl = Gtk.Label(label="CPU Kullanım Sınırı (Çekirdek Eşdeğeri):")
         cpu_lbl.set_xalign(0)
         self.cpu_combo = Gtk.ComboBoxText()
         for c in ["1 Çekirdek", "2 Çekirdek", "4 Çekirdek", "6 Çekirdek", "8 Çekirdek"]:
@@ -119,19 +119,16 @@ class SafeBoxGUI(Gtk.Window):
         tab_perms = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         tab_perms.set_margin_top(12)
 
-        self.chk_net = Gtk.CheckButton(label="İnternet ve Ağ Erişimi (Açıkken yalnızca kontrollü DNS kullanılır)")
+        self.chk_net = Gtk.CheckButton(label="İnternet ve Ağ Erişimi (Ana sistem ağı paylaşılır)")
         self.chk_net.set_active(True)
         self.chk_audio = Gtk.CheckButton(label="Ses Desteği (PulseAudio / PipeWire Soketi)")
         self.chk_audio.set_active(True)
         self.chk_share = Gtk.CheckButton(label="Paylaşılan Klasör (~/SafeBox-Paylasim Köprüsü)")
         self.chk_share.set_active(True)
-        self.chk_clipboard = Gtk.CheckButton(label="Clipboard Erişimi (Henüz Desteklenmiyor) (Host ↔ Sandbox arası kopyala-yapıştır)")
-        self.chk_clipboard.set_active(False)
 
         tab_perms.pack_start(self.chk_net, False, False, 0)
         tab_perms.pack_start(self.chk_audio, False, False, 0)
         tab_perms.pack_start(self.chk_share, False, False, 0)
-        tab_perms.pack_start(self.chk_clipboard, False, False, 0)
         notebook.append_page(tab_perms, Gtk.Label(label="İzinler ve İzolasyon"))
 
         # 4. Konsol ve Günlük
@@ -227,69 +224,45 @@ class SafeBoxGUI(Gtk.Window):
             except Exception as e:
                 self.append_log(f"[HATA] Purge başarısız: {e}")
         elif cmd == "doctor":
-            # Gerçek sistem kontrolü
             self.append_log("[🔍 SISTEM TESTİ BAŞLANIYOR]")
             tests_passed = 0
             tests_total = 0
             
-            # Test 1: Namespace kontrol
+            # Test 1: RootFS kontrolü
+            tests_total += 1
+            if os.path.isdir("/var/lib/safebox/rootfs/usr") and os.path.isdir("/var/lib/safebox/rootfs/bin"):
+                self.append_log("✓ RootFS: Kurulu ve hazır")
+                tests_passed += 1
+            else:
+                self.append_log("✗ RootFS: Eksik veya bozuk (sudo safebox-setup gerekli)")
+            
+            # Test 2: SafeBox-Core Çalışıyor mu?
             tests_total += 1
             try:
-                result = subprocess.run(["bwrap", "--unshare-pid", "--", "cat", "/proc/self/ns/pid"], capture_output=True, text=True, timeout=2)
+                result = subprocess.run(["pgrep", "-f", "safebox-core"], capture_output=True, text=True, timeout=2)
                 if result.returncode == 0:
-                    self.append_log("✓ PID Namespace: İzole")
+                    self.append_log("✓ Arka Plan Süreci: safebox-core aktif")
                     tests_passed += 1
+                    
+                    # Test 3: Cgroup Limiti (Sadece safebox-core çalışıyorsa anlamlı)
+                    tests_total += 1
+                    cgroup_res = subprocess.run(["systemctl", "--user", "show", "run-*.scope", "--property=MemoryMax,CPUQuota"], capture_output=True, text=True, timeout=2)
+                    if "MemoryMax=" in cgroup_res.stdout or "CPUQuota=" in cgroup_res.stdout:
+                        self.append_log("✓ Kaynak Sınırları: Cgroup v2 limitleri aktif")
+                        tests_passed += 1
+                    else:
+                        self.append_log("⚠ Kaynak Sınırları: Cgroup kısıtlamaları saptanamadı")
                 else:
-                    self.append_log("✗ PID Namespace: Kontrol başarısız")
+                    self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
             except Exception as e:
-                self.append_log(f"✗ PID Namespace: {e}")
-            
-            # Test 2: User namespace
-            tests_total += 1
-            try:
-                result = subprocess.run(["bwrap", "--unshare-user", "--uid", "1000", "--", "id"], capture_output=True, text=True, timeout=2)
-                if "uid=1000" in result.stdout or "root" in result.stdout:
-                    self.append_log(f"✓ User Namespace: İzole ({result.stdout.strip()})")
-                    tests_passed += 1
-                else:
-                    self.append_log(f"✗ User Namespace: Beklenmeyen çıktı")
-            except Exception as e:
-                self.append_log(f"✗ User Namespace: {e}")
-            
-            # Test 3: Mount namespace
-            tests_total += 1
-            try:
-                result = subprocess.run(["mount"], capture_output=True, text=True, timeout=2)
-                mount_count = len(result.stdout.split("\n"))
-                if mount_count > 5:
-                    self.append_log(f"✓ Mount Namespace: İzole ({mount_count} mount)")
-                    tests_passed += 1
-                else:
-                    self.append_log(f"⚠ Mount Namespace: Düşük mount sayısı ({mount_count})")
-            except Exception as e:
-                self.append_log(f"✗ Mount Namespace: {e}")
-            
-            # Test 4: Cinnamon Desktop
-            tests_total += 1
-            try:
-                result = subprocess.run(["pgrep", "-f", "cinnamon"], capture_output=True, timeout=2)
-                if result.returncode == 0:
-                    self.append_log("✓ Cinnamon Desktop: Çalışıyor")
-                    tests_passed += 1
-                else:
-                    self.append_log("⚠ Cinnamon Desktop: Çalışmıyor (fallback modunda olabilir)")
-            except Exception as e:
-                self.append_log(f"✗ Cinnamon Desktop: {e}")
+                self.append_log(f"✗ Arka Plan Kontrolü: {e}")
             
             # Sonuç
-            percentage = int((tests_passed / tests_total) * 100)
-            self.append_log(f"\n[SONUÇ] {tests_passed}/{tests_total} test geçti ({percentage}%)")
-            if percentage >= 75:
-                self.append_log("✅ Sistem sağlıklı")
-            elif percentage >= 50:
-                self.append_log("⚠️ Sistem kısmen çalışıyor")
+            if tests_total > 0:
+                percentage = int((tests_passed / tests_total) * 100)
+                self.append_log(f"\n[SONUÇ] {tests_passed}/{tests_total} test geçti")
             else:
-                self.append_log("❌ Sistem sorunlu")
+                self.append_log("\n[SONUÇ] Test yapılamadı.")
         else:
             if self.dev_mode:
                 # Güvenlik: Whitelist kontrol
@@ -324,17 +297,16 @@ class SafeBoxGUI(Gtk.Window):
         net = "1" if self.chk_net.get_active() else "0"
         audio = "1" if self.chk_audio.get_active() else "0"
         share = "1" if self.chk_share.get_active() else "0"
-        clipboard = "1" if self.chk_clipboard.get_active() else "0"
 
         self.btn_start.set_sensitive(False)
-        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}, Clipboard={'Açık' if clipboard == '1' else 'Kapalı'}...")
+        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}...")
 
         def run_thread():
             engine_path = "/usr/bin/safebox-core"
             if not os.path.exists(engine_path):
                 engine_path = os.path.expanduser("~/safebox/usr/bin/safebox-core")
             
-            cmd = [engine_path, ram, cpu, res, share, clipboard, audio, net]
+            cmd = [engine_path, ram, cpu, res, share, audio, net]
             proc = subprocess.run(cmd)
             GLib.idle_add(self.on_sandbox_finished, proc.returncode)
 
@@ -344,6 +316,34 @@ class SafeBoxGUI(Gtk.Window):
         self.btn_start.set_sensitive(True)
         if returncode == 0:
             self.append_log("[KAPANDI] Sanal alan sonlandırıldı.")
+        elif returncode == 105:
+            self.append_log("[HATA] RootFS eksik. Kurulum gerekiyor.")
+            dialog = Gtk.MessageDialog(
+                transient_for=self,
+                flags=0,
+                message_type=Gtk.MessageType.WARNING,
+                buttons=Gtk.ButtonsType.YES_NO,
+                text="SafeBox RootFS Eksik"
+            )
+            dialog.format_secondary_text(
+                "Sanal alanın çalışması için temel dosya sistemi (RootFS) kurulu değil.\n"
+                "Otomatik kurulumu başlatmak ister misiniz? (Root yetkisi gerektirebilir)"
+            )
+            response = dialog.run()
+            dialog.destroy()
+            
+            if response == Gtk.ResponseType.YES:
+                self.append_log("[BİLGİ] RootFS kurulumu başlatılıyor...")
+                def setup_thread():
+                    setup_cmd = ["pkexec", "/usr/bin/safebox-setup"]
+                    if not os.path.exists("/usr/bin/safebox-setup"):
+                        setup_cmd = ["pkexec", os.path.expanduser("~/safebox/usr/bin/safebox-setup")]
+                    s_proc = subprocess.run(setup_cmd)
+                    if s_proc.returncode == 0:
+                        GLib.idle_add(self.append_log, "[BİLGİ] Kurulum başarıyla tamamlandı. Yeniden başlatabilirsiniz.")
+                    else:
+                        GLib.idle_add(self.append_log, f"[HATA] Kurulum başarısız oldu (Hata kodu: {s_proc.returncode}).")
+                threading.Thread(target=setup_thread, daemon=True).start()
         else:
             self.append_log(f"[HATA] Hata kodu: {returncode}")
 

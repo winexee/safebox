@@ -6,9 +6,8 @@ RAM_GB="${1:-4}"
 CPU_CORES="${2:-4}"
 RESOLUTION="${3:-1366x768}"
 SHARE_FOLDER="${4:-1}"
-CLIPBOARD="${5:-1}"
-AUDIO="${6:-1}"
-NET="${7:-1}"
+AUDIO="${5:-1}"
+NET="${6:-1}"
 
 ROOTFS="/var/lib/safebox/rootfs"
 
@@ -18,6 +17,11 @@ SYS_MOCK_DIR="${LOG_DIR}/mock_sys"
 ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
 mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu" "$ETC_MOCK_DIR"
+
+if [ ! -d "$ROOTFS/usr" ] || [ ! -d "$ROOTFS/bin" ]; then
+    echo "[HATA] RootFS eksik veya bozuk: $ROOTFS" >> "$ENGINE_LOG"
+    exit 105
+fi
 
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.6 Başlatılıyor ===" > "$ENGINE_LOG"
 
@@ -166,7 +170,11 @@ for file in "${GUEST_ETC_FILES[@]}"; do
 done
 
 BWRAP_ARGS=(
-    --unshare-all
+    --unshare-user
+    --unshare-ipc
+    --unshare-pid
+    --unshare-uts
+    --unshare-cgroup
     --uid 1000
     --gid 1000
     --hostname safebox-sandbox
@@ -221,16 +229,13 @@ for nv_node in /dev/nvidia0 /dev/nvidiactl /dev/nvidia-modeset /dev/nvidia-uvm; 
 done
 
 # Ağ - İzole Namespace (Network Isolation)
-# Not: --unshare-all ile ağ namespace'i varsayılan olarak izole edilmiştir
-# NET=1 seçilirse, DNS erişimi sağlanırken network izolasyonu korunur
 if [ "$NET" = "1" ]; then
-    echo "[BİLGİ] Ağ köprüsü (slirp4netns) başlatılıyor..."
-    # TODO: İleriki sürümde buraya slirp4netns komutları eklenecek.
+    echo "[BİLGİ] Ağ namespace'i paylaşılıyor (Ana makine internet erişimi)." >> "$ENGINE_LOG"
     if [ -d /run/systemd/resolve ]; then BWRAP_ARGS+=(--ro-bind /run/systemd/resolve /run/systemd/resolve); fi
     if [ -f /etc/resolv.conf ]; then BWRAP_ARGS+=(--ro-bind-try /etc/resolv.conf /etc/resolv.conf); fi
-    echo "[BİLGİ] Ağ namespace'i izole (DNS erişimi: etkin)" >> "$ENGINE_LOG"
 else
-    echo "[BİLGİ] Ağ erişimi kapatıldı" >> "$ENGINE_LOG"
+    echo "[BİLGİ] Ağ namespace'i tamamen izole ediliyor (İnternet yok)." >> "$ENGINE_LOG"
+    BWRAP_ARGS+=(--unshare-net)
 fi
 
 # Ses - XDG_RUNTIME_DIR kontrolü
@@ -254,14 +259,7 @@ if [ "$AUDIO" = "1" ]; then
     fi
 fi
 
-# Clipboard
-# X11 clipboard bir dosya socket'i değildir.
-# Gerçek clipboard bridge kurulmadıkça fail-closed davran.
-if [ "$CLIPBOARD" = "1" ]; then
-    echo "[UYARI] Clipboard bridge henüz kurulmadı; clipboard aktarımı aktif değil." >> "$ENGINE_LOG"
-else
-    echo "[BİLGİ] Clipboard erişimi kapalı." >> "$ENGINE_LOG"
-fi
+
 
 # Paylaşım Klasörü
 if [ "$SHARE_FOLDER" = "1" ]; then

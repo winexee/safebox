@@ -1,48 +1,27 @@
 # SafeBox Code Analysis & Fixes (v1.7.6)
 
-## ✅ DÜZELTILDI — Tüm Bilinen Hatalar
+## ✅ DÜZELTİLDİ — İzolasyon ve Dürüstlük Güncellemesi (Kullanıcı Bildirimleri)
 
-### 1. ✅ Eksik guest-etc Dosyaları (Sandbox Başlamama Sorunu)
-**Çözüm:** `guest-etc/` dizini altına passwd, group, shadow, nsswitch.conf, hostname, hosts dosyaları eklendi.
+### 1. Ağ İzolasyonu (NET Argümanı)
+**Çözüm:** `--unshare-all` yerine spesifik namespace komutları eklendi. `NET=1` ise host ağı paylaşılır (`--share-net` muadili), `NET=0` ise `--unshare-net` eklenerek tam izole edilir.
 
-### 2. ✅ Eksik guest-apps Dosyaları
-**Çözüm:** `guest-apps/` dizini altına browser, terminal, home, editor, monitor, share .desktop dosyaları eklendi.
+### 2. /dev ve Donanım İzolasyonu Açıklamaları
+**Çözüm:** Uygulamanın VM (Sanal Makine) olmadığı, konteyner olduğu açıkça belgelendi. `/dev/dri` pass-through nedeniyle izolasyon sınırları dürüstçe belirtildi.
 
-### 3. ✅ Eksik safebox-guest-blocker
-**Çözüm:** İç içe sandbox çalıştırmayı engelleyen betik oluşturuldu.
+### 3. Doctor Testi
+**Çözüm:** GUI içindeki `doctor` komutu sahte namespace count testlerini bıraktı. Artık şunları ölçüyor:
+1. RootFS varlığı ve bütünlüğü.
+2. Arka planda aktif `safebox-core` process'i.
+3. Çalışan süreçler için cgroup v2 (`MemoryMax`, `CPUQuota`) sınırlarının durumu.
 
-### 4. ✅ RootFS Oluşturma Mekanizması
-**Çözüm:** `safebox-setup` betiği eklendi. `sudo safebox-setup` ile debootstrap tabanlı Cinnamon rootfs oluşturulur.
+### 4. Clipboard Kaldırılması
+**Çözüm:** Çalışmayan ve fail-closed durumda olan clipboard kodu, argümanı ve UI butonu kaldırıldı.
 
-### 5. ✅ --tmpfs /dev ve --dev /dev Çakışması
-**Çözüm:** `--tmpfs /dev` kaldırıldı, `--dev /dev` önce gelecek şekilde düzenlendi.
+### 5. RootFS Otomatik Kurulum (Exit 105)
+**Çözüm:** `safebox-core` başlatılırken RootFS yoksa `exit 105` döner. `safebox_gui.py` bu kodu yakalar ve kullanıcıya "Kurulum başlasın mı?" diye sorup `pkexec safebox-setup` tetikler.
 
-### 6. ✅ shell=True Güvenlik Açığı
-**Çözüm:** Güvensiz `.save` yedek dosyaları silindi. Mevcut GUI `shell=False` kullanıyor.
+### 6. CPU ve RAM Terminolojisi
+**Çözüm:** "Sanal RAM" yerine "RAM Sınırı (Cgroup v2)" gibi gerçeği yansıtan terminoloji kullanıldı.
 
-### 7. ✅ Clipboard Etiketi 3x Tekrar
-**Çözüm:** Tek "(Henüz Desteklenmiyor)" olarak düzeltildi.
-
-### 8. ✅ Ağ Mesajı 3x Tekrar
-**Çözüm:** Tek mesaj olarak düzeltildi.
-
-### 9. ✅ Masaüstü Ortamı Tutarsızlığı
-**Çözüm:** Tüm referanslar Cinnamon olarak birleştirildi (README, debian/control, metainfo.xml).
-
-### 10. ✅ Sürüm Tutarsızlıkları
-**Çözüm:** Tüm dosyalardaki sürüm numaraları v1.7.6 olarak eşitlendi.
-
-### 11. ✅ Yanlış Lisans (metainfo.xml)
-**Çözüm:** GPL-3.0+ → MIT olarak düzeltildi.
-
-### 12. ✅ welcome.py Türkçe Karakter Sorunu
-**Çözüm:** Tüm ASCII Türkçe karakterler UTF-8'e dönüştürüldü.
-
-### 13. ✅ Gereksiz .save Yedek Dosyaları
-**Çözüm:** 4 adet .save dosyası silindi, .gitignore'a eklendi.
-
-### 14. ✅ debian/ Build Artifact'ları
-**Çözüm:** Build çıktıları git'ten kaldırıldı, .gitignore'a eklendi.
-
-### 15. ✅ Eksik debian/install Dosyaları
-**Çözüm:** Tüm yeni dosyalar install manifest'ine eklendi.
+### 7. README ve Dokümantasyon
+**Çözüm:** README dosyası baştan yazılarak iddialar gerçekçi seviyelere çekildi. Loglama kalıntıları ve sistem mimarisi şeffaf bir şekilde eklendi.

@@ -23,7 +23,8 @@ Depends: ${misc:Depends},
          gnome-system-monitor,
          firefox,
          yaru-theme-icon,
-         yaru-theme-gtk
+         yaru-theme-gtk,
+         policykit-1
 Recommends: debootstrap
 Description: Güvenli ve tam izole sanal masaüstü ortamı
  SafeBox; Bubblewrap, Cinnamon ve Xephyr altyapısını birleştirerek 
