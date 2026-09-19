@@ -18,10 +18,21 @@ ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
 mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu" "$ETC_MOCK_DIR"
 
-if [ ! -d "$ROOTFS/usr" ] || [ ! -d "$ROOTFS/bin" ]; then
-    echo "[HATA] RootFS eksik veya bozuk: $ROOTFS" >> "$ENGINE_LOG"
+if [ ! -f "$ROOTFS/.safebox-rootfs-complete" ]; then
+    echo "[HATA] RootFS eksik veya tam kurulmamış: $ROOTFS" >> "$ENGINE_LOG"
     exit 105
 fi
+
+# Tekli oturum kilidi (Race condition önleme)
+LOCK_FILE="/tmp/safebox.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "[HATA] SafeBox zaten çalışıyor. Aynı anda birden fazla oturum açılamaz." >> "$ENGINE_LOG"
+    exit 106
+fi
+
+# Doctor testi için PID kaydet
+echo $$ > "/tmp/safebox-core.pid"
 
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.6 Başlatılıyor ===" > "$ENGINE_LOG"
 

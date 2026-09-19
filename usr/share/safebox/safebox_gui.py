@@ -228,10 +228,10 @@ class SafeBoxGUI(Gtk.Window):
             tests_passed = 0
             tests_total = 0
             
-            # Test 1: RootFS kontrolü
+            # Test 1: RootFS kontrolü (Derin Doğrulama)
             tests_total += 1
-            if os.path.exists("/var/lib/safebox/rootfs/.safebox-rootfs-complete"):
-                self.append_log("✓ RootFS: Tam ve eksiksiz kurulu (.safebox-rootfs-complete)")
+            if os.path.exists("/var/lib/safebox/rootfs/.safebox-rootfs-complete") and os.path.exists("/var/lib/safebox/rootfs/usr/bin/cinnamon-session"):
+                self.append_log("✓ RootFS: Tam ve eksiksiz kurulu (.safebox-rootfs-complete ve çalıştırılabilir ortam)")
                 tests_passed += 1
             else:
                 self.append_log("✗ RootFS: Eksik veya hatalı kurulum (sudo safebox-setup gerekli)")
@@ -250,14 +250,17 @@ class SafeBoxGUI(Gtk.Window):
                         self.append_log(f"✓ Arka Plan Süreci: safebox-core aktif (PID: {core_pid})")
                         tests_passed += 1
                         
-                        # Test 3: Cgroup Limiti
+                        # Test 3: Cgroup Limiti (Gerçek Sandbox Kapsamı)
                         tests_total += 1
-                        cgroup_res = subprocess.run(["systemctl", "--user", "show", "safebox-app.scope", "--property=MemoryMax,CPUQuota"], capture_output=True, text=True, timeout=2)
-                        if "MemoryMax=" in cgroup_res.stdout and "infinity" not in cgroup_res.stdout:
-                            self.append_log("✓ Kaynak Sınırları: safebox-app.scope aktif ve limitli")
-                            tests_passed += 1
-                        else:
-                            self.append_log("⚠ Kaynak Sınırları: safebox-app.scope saptanamadı veya limitsiz")
+                        try:
+                            cgroup_path = subprocess.run(["cat", f"/proc/{core_pid}/cgroup"], capture_output=True, text=True, timeout=2).stdout
+                            if "safebox-app.scope" in cgroup_path:
+                                self.append_log("✓ Kaynak Sınırları: Süreç başarıyla izole edilmiş Cgroup içinde çalışıyor (safebox-app.scope)")
+                                tests_passed += 1
+                            else:
+                                self.append_log(f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})")
+                        except Exception as e:
+                            self.append_log(f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})")
                     else:
                         self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
                 except Exception as e:
