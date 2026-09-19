@@ -81,6 +81,7 @@ mkdir -p "$ROOTFS_TMP"
 
 debootstrap \
     --variant=minbase \
+    --components=main,universe,restricted,multiverse \
     --include=cinnamon-core,cinnamon-session,nemo,xed,gnome-terminal,firefox,gnome-system-monitor,dbus-x11,locales,fonts-noto,fonts-noto-color-emoji,adwaita-icon-theme \
     "$DISTRO" \
     "$ROOTFS_TMP" \
