@@ -26,10 +26,11 @@ class WelcomeWindow(Gtk.Window):
         # Bilgilendirme Metni
         desc = Gtk.Label()
         desc.set_markup(
-            "Bu sanal masaüstünde yaptığınız hiçbir işlem ana sisteminizi etkilemez.\n\n"
-            "• <b>Dosya Güvenliği:</b> Kişisel verileriniz tamamen gizlenmiştir.\n"
-            "• <b>Geçici Hafıza:</b> Pencere kapandığında tüm değişiklikler silinir.\n"
-            "• <b>Tam İzolasyon:</b> Şüpheli dosyaları güvenle açabilirsiniz."
+            "Bu izole konteynerde (namespace) yaptığınız işlemler ana sisteminizi korur.\n\n"
+            "• <b>Sistem Güvenliği:</b> Ana dosya sisteminiz salt-okunur korunur.\n"
+            "• <b>Geçici Hafıza:</b> İndirdiğiniz veriler kapandığında silinir (RAM).\n"
+            "• <b>Donanım Erişimi:</b> GPU ve ses performans için paylaşılmıştır.\n"
+            "• <b>Uyarı:</b> Bir sanal makine (VM) değildir, dikkatli kullanın."
         )
         desc.set_line_wrap(True)
         vbox.pack_start(desc, True, True, 0)
