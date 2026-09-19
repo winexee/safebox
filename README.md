@@ -5,6 +5,7 @@
 [![Release](https://img.shields.io/badge/Release-v1.7.6-brightgreen.svg)](https://github.com/winexee/safebox/releases)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Bash](https://img.shields.io/badge/Bash-5.0+-red.svg)](https://www.gnu.org/software/bash/)
+[![safebox](https://snapcraft.io/safebox/badge.svg)](https://snapcraft.io/safebox)
 
 SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinmek ve ana sistem dosya yapısını korumak için geliştirilmiş, **Bubblewrap** tabanlı bir **konteyner (namespace)** sanal alanıdır.
 
