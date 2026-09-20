@@ -128,11 +128,10 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
 
     # Temel masaüstü ortamı (bağımlılık sorunu olmayan paketler)
     apt-get install -y --no-install-recommends \
-        openbox \
-        lxpanel \
-        lxtask \
-        pcmanfm \
-        xterm \
+        cinnamon-core \
+        nemo \
+        gnome-terminal \
+        gnome-system-monitor \
         gedit \
         epiphany-browser \
         dbus-x11 \
@@ -198,7 +197,7 @@ echo ""
 echo "  Konum : $ROOTFS_DIR"
 echo "  Boyut : $ROOTFS_SIZE"
 echo "  Distro: Ubuntu $DISTRO (24.04 LTS)"
-echo -e "  DE    : Openbox / LXPanel"
+echo -e "  DE    : Cinnamon"
 echo ""
 echo "  Artık SafeBox'ı başlatabilirsiniz:"
 echo "    safebox"

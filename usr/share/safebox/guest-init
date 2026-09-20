@@ -36,24 +36,8 @@ gtk-icon-theme-name="Yaru"
 gtk-font-name="Sans 10"
 EOF
 
-# PCManFM Arkaplan Ayarı (Masaüstü siyah kalmasın diye)
-mkdir -p /home/safebox/.config/pcmanfm/default
-cat > /home/safebox/.config/pcmanfm/default/desktop-items-0.conf << 'EOF'
-[*]
-wallpaper_mode=color
-desktop_bg=#2c3e50
-desktop_shadow=#000000
-desktop_fg=#ffffff
-EOF
+export CINNAMON_SOFTWARE_RENDERING=1
+export LIBGL_ALWAYS_SOFTWARE=1
 
-# Güzel bir arkaplan rengi ayarla (pcmanfm devreye girene kadar veya yerine)
-if which xsetroot >/dev/null 2>&1; then
-    xsetroot -solid "#2c3e50"
-fi
-
-# Temel masaüstü bileşenlerini başlat
-lxpanel &
-pcmanfm --desktop &
-
-# Openbox oturum başlat
-exec dbus-run-session -- openbox
+# Temel masaüstü bileşenlerini başlat (Cinnamon'un DBus oturumu ile başlaması gerekir)
+exec dbus-run-session -- cinnamon-session

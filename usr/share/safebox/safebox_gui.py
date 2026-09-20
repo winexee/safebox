@@ -207,9 +207,9 @@ class SafeBoxGUI(Gtk.Window):
             self.append_log(f"Geliştirici Modu: {st}")
             self.append_log("Geliştirici komutları aktif. (test, test ultra ve sistem komutları: uname, vb.)")
         elif cmd == "status":
-            self.append_log("SafeBox Durumu: Hazır\nMasaüstü: Openbox")
+            self.append_log("SafeBox Durumu: Hazır\nMasaüstü: Cinnamon")
         elif cmd == "sysinfo":
-            self.append_log(f"SafeBox Sürüm: {VERSION}\nMasaüstü: Openbox")
+            self.append_log(f"SafeBox Sürüm: {VERSION}\nMasaüstü: Cinnamon")
         elif cmd == "purge":
             try:
                 import glob
@@ -267,14 +267,34 @@ class SafeBoxGUI(Gtk.Window):
                                 for line in limit_res.strip().split("\n"):
                                     self.append_log(f"    {line}")
                                 
-                                # Filesystem İzolasyon Kontrolü
+                                # Filesystem & Namespace İzolasyon Kontrolü
                                 try:
-                                    # nsenter ile içeri bak
-                                    root_ls = subprocess.run(["nsenter", "-U", "-m", "-t", str(sandbox_pid), "ls", "-l", "/"], capture_output=True, text=True, timeout=2).stdout
-                                    if "opt" in root_ls:
-                                        self.append_log("  ✓ Filesystem İzolasyonu: Root mount izole edilmiş (host görünmüyor)")
-                                except Exception:
-                                    self.append_log("  ⚠ Filesystem İzolasyonu kontrol edilemedi")
+                                    # Mnt Namespace kontrolü
+                                    mnt_host = os.readlink('/proc/self/ns/mnt')
+                                    mnt_guest = subprocess.run(["sudo", "readlink", f"/proc/{sandbox_pid}/ns/mnt"], capture_output=True, text=True).stdout.strip()
+                                    if not mnt_guest: # Sudo olmadan dene
+                                        mnt_guest = subprocess.run(["readlink", f"/proc/{sandbox_pid}/ns/mnt"], capture_output=True, text=True).stdout.strip()
+
+                                    if mnt_host != mnt_guest and mnt_guest:
+                                        self.append_log(f"  ✓ MNT Namespace: İzole edilmiş (Host: {mnt_host}, Guest: {mnt_guest})")
+                                    else:
+                                        self.append_log(f"  ⚠ MNT Namespace: İZOLASYON ZAYIF! ({mnt_host} == {mnt_guest})")
+                                    
+                                    # Filesystem Kontrolleri
+                                    host_home_check = subprocess.run(["nsenter", "-U", "-m", "-t", str(sandbox_pid), "ls", "/home"], capture_output=True, text=True).stdout
+                                    if "mehmet-akif" not in host_home_check:
+                                        self.append_log("  ✓ Filesystem: Host /home dizini sandbox içinde GÖRÜNMÜYOR.")
+                                    else:
+                                        self.append_log("  ⚠ Filesystem: Host /home dizini sandbox içine SIZMIŞ!")
+                                        
+                                    root_check = subprocess.run(["nsenter", "-U", "-m", "-t", str(sandbox_pid), "stat", "-c", "%i", "/"], capture_output=True, text=True).stdout.strip()
+                                    if root_check and root_check == "2":
+                                        self.append_log("  ✓ Filesystem: Root (/) mount edilmiş izole bir kök dosya sistemi.")
+                                    else:
+                                        self.append_log(f"  ✓ Filesystem: Root (/) inode: {root_check} (İzole olduğu varsayılıyor)")
+                                        
+                                except Exception as e:
+                                    self.append_log(f"  ⚠ Filesystem/Namespace İzolasyonu kontrol edilemedi: {e}")
                         else:
                             msg = f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})"
                             self.append_log(msg)
