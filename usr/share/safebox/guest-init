@@ -14,7 +14,7 @@ mkdir -p /home/safebox/Desktop /home/safebox/Downloads /home/safebox/Documents /
 
 # Masaüstü Simgeleri
 for app in browser home share terminal editor; do
-    app_file="/opt/guest-apps/${app}.desktop"
+    app_file="/mnt/${app}.desktop"
     if [ -f "$app_file" ]; then
         cp "$app_file" /home/safebox/Desktop/ 2>/dev/null && chmod +x /home/safebox/Desktop/${app}.desktop 2>/dev/null || true
     fi
