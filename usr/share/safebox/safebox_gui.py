@@ -246,13 +246,20 @@ class SafeBoxGUI(Gtk.Window):
                 import subprocess
                 sandbox_pid = None
                 
-                # Gerçek Sandbox Sürecini Bulma (bwrap child process)
-                bwrap_res = subprocess.run(["pgrep", "-f", "bwrap.*guest-init"], capture_output=True, text=True)
-                for bpid in bwrap_res.stdout.split():
-                    child_res = subprocess.run(["pgrep", "-P", bpid.strip()], capture_output=True, text=True)
-                    if child_res.stdout.strip():
-                        sandbox_pid = child_res.stdout.strip().split()[0]
-                        break
+                # Gerçek Sandbox Sürecini Bulma (bwrap info-fd json)
+                import json
+                try:
+                    with open("/tmp/safebox-bwrap.json", "r") as jf:
+                        bwrap_info = json.load(jf)
+                        sandbox_pid = str(bwrap_info.get("child-pid", ""))
+                except Exception:
+                    # Fallback
+                    bwrap_res = subprocess.run(["pgrep", "-f", "bwrap.*guest-init"], capture_output=True, text=True)
+                    for bpid in bwrap_res.stdout.split():
+                        child_res = subprocess.run(["pgrep", "-P", bpid.strip()], capture_output=True, text=True)
+                        if child_res.stdout.strip():
+                            sandbox_pid = child_res.stdout.strip().split()[0]
+                            break
                         
                 if sandbox_pid and sandbox_pid != "0":
                     self.append_log(f"✓ Arka Plan Süreci: Aktif (PID: {sandbox_pid})")
@@ -268,10 +275,40 @@ class SafeBoxGUI(Gtk.Window):
                             
                             # Gerçek Limit Kontrolü (Sadece Ultra)
                             if is_ultra:
-                                limit_res = subprocess.run(["systemctl", "--user", "show", "safebox-app.scope", "--property=MemoryMax,CPUQuotaPerSecUSec"], capture_output=True, text=True, timeout=2).stdout
-                                self.append_log("  - Uygulanan Cgroup Limitleri:")
-                                for line in limit_res.strip().split("\n"):
-                                    self.append_log(f"    {line}")
+                                tests_total += 2
+                                try:
+                                    limit_res = subprocess.run(["systemctl", "--user", "show", "safebox-app.scope", "--property=MemoryMax,CPUQuotaPerSecUSec"], capture_output=True, text=True, timeout=2).stdout
+                                    parsed_limits = {}
+                                    for line in limit_res.strip().split("\n"):
+                                        if "=" in line:
+                                            k, v = line.split("=", 1)
+                                            parsed_limits[k] = v.strip()
+                                            
+                                    expected_ram = str(int(self.ram_combo.get_active_text().split()[0]) * 1024**3)
+                                    expected_cpu = str(int(self.cpu_combo.get_active_text().split()[0]) * 100000)
+                                    
+                                    actual_mem = parsed_limits.get("MemoryMax", "")
+                                    actual_cpu = parsed_limits.get("CPUQuotaPerSecUSec", "")
+                                    
+                                    if actual_mem == expected_ram or actual_mem == "[not set]" and expected_ram == "0":
+                                        self.append_log(f"  ✓ Cgroup RAM: Seçilen değer uygulandı (MemoryMax={actual_mem})")
+                                        tests_passed += 1
+                                    else:
+                                        self.append_log(f"  ✗ Cgroup RAM: HATALI! Beklenen: {expected_ram}, Uygulanan: {actual_mem}")
+                                        errors.append("Cgroup RAM limiti hatalı.")
+                                        
+                                    if actual_cpu == expected_cpu or actual_cpu == "[not set]" and expected_cpu == "0":
+                                        self.append_log(f"  ✓ Cgroup CPU: Seçilen değer uygulandı (CPUQuota={actual_cpu})")
+                                        tests_passed += 1
+                                    else:
+                                        self.append_log(f"  ✗ Cgroup CPU: HATALI! Beklenen: {expected_cpu}, Uygulanan: {actual_cpu}")
+                                        errors.append("Cgroup CPU limiti hatalı.")
+                                        
+                                except Exception as e:
+                                    self.append_log(f"  ⚠ Cgroup Limitleri doğrulanamadı: {e}")
+                                    errors.append("Cgroup doğrulama hatası.")
+                                    # Fallback for systems without systemd-run but we won't count tests_total
+                                    tests_total -= 2
                                 
                                 # Filesystem & Namespace İzolasyon Kontrolü
                                 try:
@@ -287,16 +324,14 @@ class SafeBoxGUI(Gtk.Window):
                                                 errors.append(f"{name} Namespace okunamadı.")
                                                 continue
                                                 
-                                            if ns == 'net' and not self.network_switch.get_active():
-                                                # Ağ kapalıysa (NET=0) network namespace izole olmalı
+                                            if ns == 'net' and not self.chk_net.get_active():
                                                 if h != g:
                                                     self.append_log(f"  ✓ {name} Namespace: İzole (Guest: {g.split(':')[-1][:-1]})")
                                                     tests_passed += 1
                                                 else:
                                                     self.append_log(f"  ✗ {name} Namespace: HOST İLE PAYLAŞILMIŞ! (KAPALI OLMASINA RAĞMEN)")
                                                     errors.append(f"{name} Namespace izole edilmemiş!")
-                                            elif ns == 'net' and self.network_switch.get_active():
-                                                # Ağ açıksa (NET=1) host ile aynı olması normaldir
+                                            elif ns == 'net' and self.chk_net.get_active():
                                                 self.append_log(f"  ✓ {name} Namespace: Ağ isteyerek host ile paylaşıldı (NET=1).")
                                                 tests_passed += 1
                                             else:
@@ -313,33 +348,76 @@ class SafeBoxGUI(Gtk.Window):
                                     import getpass
                                     current_user = getpass.getuser()
                                     
-                                    # Filesystem Kontrolleri
+                                    # Filesystem Kontrolleri (Doğrudan /proc/PID/mountinfo üzerinden - nsenter olmadan)
                                     tests_total += 1
-                                    host_home_check = subprocess.run(["nsenter", "-U", "-m", "-t", str(sandbox_pid), "ls", "/home"], capture_output=True, text=True).stdout
-                                    if "safebox" in host_home_check and current_user not in host_home_check:
-                                        self.append_log(f"  ✓ Filesystem: Host /home/{current_user} görünmüyor, guest izole.")
-                                        tests_passed += 1
-                                    else:
-                                        self.append_log(f"  ✗ Filesystem: Host /home dizini SIZMIŞ!")
-                                        errors.append("Host /home dizini sızıntısı!")
+                                    try:
+                                        with open(f"/proc/{sandbox_pid}/mountinfo", "r") as mf:
+                                            mountinfo = mf.read()
+                                            
+                                        # Root sızıntı kontrolü
+                                        leaks = [f"/home/{current_user}", "/root", "/mnt", "/media"]
+                                        leak_found = False
+                                        for leak in leaks:
+                                            if f" {leak} " in mountinfo or f" {leak}/" in mountinfo:
+                                                leak_found = True
+                                                self.append_log(f"  ✗ Filesystem: Host {leak} dizini SIZMIŞ!")
+                                                errors.append(f"Host {leak} sızıntısı!")
+                                        
+                                        if not leak_found:
+                                            self.append_log("  ✓ Filesystem: Host özel dizinleri (/home, /root, vb.) izole.")
+                                            tests_passed += 1
+                                    except Exception as e:
+                                        self.append_log(f"  ⚠ Filesystem: İzolasyon kontrol edilemedi: {e}")
+                                        errors.append(f"Filesystem testi hata: {e}")
                                         
                                     tests_total += 1
-                                    mountinfo = subprocess.run(["nsenter", "-U", "-m", "-t", str(sandbox_pid), "cat", "/proc/self/mountinfo"], capture_output=True, text=True).stdout
-                                    if f" /home/{current_user} " not in mountinfo and "/var/lib/safebox/rootfs" in mountinfo and " / " in mountinfo:
-                                        self.append_log("  ✓ Filesystem: Root (/) mount tablosu doğrulanıyor.")
-                                        tests_passed += 1
-                                    else:
-                                        self.append_log(f"  ✗ Filesystem: Mount tablosu zayıf veya / sızıntısı var!")
-                                        errors.append("Root mount izolasyonu başarısız.")
+                                    try:
+                                        with open(f"/proc/{sandbox_pid}/mountinfo", "r") as mf:
+                                            mounts = mf.readlines()
+                                        
+                                        root_mount = [m for m in mounts if " / " in m]
+                                        if root_mount and "/var/lib/safebox/rootfs" in root_mount[0]:
+                                            self.append_log("  ✓ Filesystem: Root (/) mount tablosu doğrulanıyor (gerçek RootFS).")
+                                            tests_passed += 1
+                                        else:
+                                            self.append_log("  ✗ Filesystem: Root (/) mount izolasyonu hatalı veya host sızıntısı var!")
+                                            errors.append("Root mount izolasyonu başarısız.")
+                                    except Exception as e:
+                                        self.append_log(f"  ⚠ Filesystem Root: İzolasyon kontrol edilemedi: {e}")
+                                        errors.append(f"Root mount testi hata: {e}")
                                         
                                     tests_total += 1
-                                    hostname_check = subprocess.run(["nsenter", "-U", "-u", "-t", str(sandbox_pid), "hostname"], capture_output=True, text=True).stdout.strip()
-                                    if hostname_check == "safebox-sandbox":
-                                        self.append_log("  ✓ UTS: Hostname 'safebox-sandbox' olarak doğrulanıyor.")
-                                        tests_passed += 1
-                                    else:
-                                        self.append_log(f"  ✗ UTS: Hostname sızıntısı! Beklenmeyen hostname '{hostname_check}'")
-                                        errors.append(f"Hostname sızıntısı: {hostname_check}")
+                                    try:
+                                        with open(f"/proc/{sandbox_pid}/mountinfo", "r") as mf:
+                                            mounts = mf.readlines()
+                                        dev_leak = False
+                                        for m in mounts:
+                                            if " /dev " in m and ("udev" in m or "devtmpfs" in m):
+                                                dev_leak = True
+                                        if dev_leak:
+                                            self.append_log("  ✗ Filesystem: /dev host ile direkt paylaşımlı!")
+                                            errors.append("/dev izolasyonu başarısız!")
+                                        else:
+                                            self.append_log("  ✓ Filesystem: /dev (Cihazlar) izole tmpfs/devtmpfs kullanıyor.")
+                                            tests_passed += 1
+                                    except Exception as e:
+                                        self.append_log(f"  ⚠ /dev: Kontrol edilemedi: {e}")
+                                        errors.append(f"/dev testi hata: {e}")
+                                        
+                                    tests_total += 1
+                                    try:
+                                        # Hostname doğrudan UTS namespace içinden okunacak, bunu /proc/sys/kernel/hostname den okuyabiliriz (ama kernel proc u namespace'e duyarlıdır)
+                                        # Yada basitçe Python ile setns yapamayacağımıza göre, subprocess nsenter'ı unprivileged şekilde deneriz:
+                                        hostname_check = subprocess.run(["nsenter", "-m", "-u", "-U", "-t", str(sandbox_pid), "hostname"], capture_output=True, text=True).stdout.strip()
+                                        if hostname_check == "safebox-sandbox":
+                                            self.append_log("  ✓ UTS: Hostname 'safebox-sandbox' olarak doğrulanıyor.")
+                                            tests_passed += 1
+                                        else:
+                                            self.append_log(f"  ✗ UTS: Hostname sızıntısı! Beklenmeyen hostname '{hostname_check}'")
+                                            errors.append(f"Hostname sızıntısı: {hostname_check}")
+                                    except Exception as e:
+                                        self.append_log(f"  ⚠ UTS: Hostname kontrol edilemedi: {e}")
+                                        errors.append(f"UTS testi hata: {e}")
                                         
                                 except Exception as e:
                                     self.append_log(f"  ⚠ Filesystem/Namespace İzolasyonu kontrol edilemedi: {e}")

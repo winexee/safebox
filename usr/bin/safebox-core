@@ -287,6 +287,8 @@ fi
 
 # X11 Socket
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
+BWRAP_ARGS+=(--info-fd 8)
+exec 8> /tmp/safebox-bwrap.json
 BWRAP_ARGS+=(--ro-bind /usr/share/safebox/guest-init /home/safebox/.local/bin/guest-init)
 
 echo "[BİLGİ] Sandbox başlatılıyor..." >> "$ENGINE_LOG"
@@ -295,12 +297,12 @@ echo "[BİLGİ] Sandbox başlatılıyor..." >> "$ENGINE_LOG"
 CPU_QUOTA_VAL=$((CPU_CORES * 100))
 
 if which systemd-run >/dev/null 2>&1; then
-    taskset -c "$CPU_AFFINITY" systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /home/safebox/.local/bin/guest-init >> "$ENGINE_LOG" 2>&1 || {
+    taskset -c "$CPU_AFFINITY" systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bwrap "${BWRAP_ARGS[@]}" /home/safebox/.local/bin/guest-init >> "$ENGINE_LOG" 2>&1 || {
         echo "[HATA] Sandbox başlatılamadı! systemd-run veya bwrap hatası." >> "$ENGINE_LOG"
         exit 107
     }
 else
-    taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /home/safebox/.local/bin/guest-init >> "$ENGINE_LOG" 2>&1 || {
+    taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" /home/safebox/.local/bin/guest-init >> "$ENGINE_LOG" 2>&1 || {
         echo "[HATA] Sandbox başlatılamadı! bwrap hatası." >> "$ENGINE_LOG"
         exit 107
     }

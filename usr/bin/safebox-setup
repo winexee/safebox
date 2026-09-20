@@ -162,7 +162,13 @@ if [ -n "$MISSING_BIN" ]; then
     print_error "Kurulum başarısız oldu!"
     exit 1
 fi
-print_ok "Tüm Cinnamon bileşenleri başarıyla kuruldu."
+
+# Gerçek çalışma testleri (version sorgusu)
+chroot "$ROOTFS_TMP" cinnamon-session --version > /dev/null 2>&1 || { print_error "cinnamon-session çalıştırılamıyor!"; exit 1; }
+chroot "$ROOTFS_TMP" cinnamon --version > /dev/null 2>&1 || { print_error "cinnamon çalıştırılamıyor!"; exit 1; }
+chroot "$ROOTFS_TMP" nemo --version > /dev/null 2>&1 || { print_error "nemo çalıştırılamıyor!"; exit 1; }
+
+print_ok "Tüm Cinnamon bileşenleri başarıyla kuruldu ve çalıştırılabilir durumda."
 
 # Servis engelini kaldır
 rm -f "$ROOTFS_TMP/usr/sbin/policy-rc.d"
