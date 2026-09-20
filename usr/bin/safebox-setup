@@ -75,19 +75,75 @@ fi
 
 print_ok "Bağımlılıklar hazır."
 
-# RootFS oluştur
-print_info "RootFS oluşturuluyor (bu işlem birkaç dakika sürebilir)..."
+# RootFS oluştur — Aşama 1: Minimal sistem
+print_info "RootFS oluşturuluyor — Aşama 1: Temel sistem (bu işlem birkaç dakika sürebilir)..."
 mkdir -p "$ROOTFS_TMP"
 
 debootstrap \
     --variant=minbase \
     --components=main,universe,restricted,multiverse \
-    --include=cinnamon-core,cinnamon-session,nemo,gedit,gnome-terminal,epiphany-browser,gnome-system-monitor,dbus-x11,locales,fonts-noto,fonts-noto-color-emoji,adwaita-icon-theme \
     "$DISTRO" \
     "$ROOTFS_TMP" \
     http://archive.ubuntu.com/ubuntu
 
 print_ok "Temel sistem oluşturuldu."
+
+# Aşama 2: Chroot içinde masaüstü paketlerini kur
+# policy-rc.d ile servis başlatmayı engelle (debootstrap hatalarını önler)
+print_info "RootFS oluşturuluyor — Aşama 2: Masaüstü ortamı kuruluyor..."
+
+# Servis başlatmayı engelle
+cat > "$ROOTFS_TMP/usr/sbin/policy-rc.d" << 'EOF'
+#!/bin/sh
+exit 101
+EOF
+chmod +x "$ROOTFS_TMP/usr/sbin/policy-rc.d"
+
+# /proc ve /dev geçici olarak bağla
+mount --bind /proc "$ROOTFS_TMP/proc" 2>/dev/null || true
+mount --bind /dev  "$ROOTFS_TMP/dev"  2>/dev/null || true
+mount --bind /sys  "$ROOTFS_TMP/sys"  2>/dev/null || true
+
+# Cleanup fonksiyonu
+cleanup_mounts() {
+    umount "$ROOTFS_TMP/proc" 2>/dev/null || true
+    umount "$ROOTFS_TMP/dev"  2>/dev/null || true
+    umount "$ROOTFS_TMP/sys"  2>/dev/null || true
+}
+trap cleanup_mounts EXIT
+
+# Depo listesini ekle (universe dahil)
+cat > "$ROOTFS_TMP/etc/apt/sources.list" << EOF
+deb http://archive.ubuntu.com/ubuntu ${DISTRO} main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu ${DISTRO}-updates main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu ${DISTRO}-security main restricted universe multiverse
+EOF
+
+# Masaüstü paketlerini kur
+chroot "$ROOTFS_TMP" /bin/bash -c "
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y --no-install-recommends \
+        cinnamon-core \
+        cinnamon-session \
+        nemo \
+        gedit \
+        gnome-terminal \
+        epiphany-browser \
+        gnome-system-monitor \
+        dbus-x11 \
+        locales \
+        fonts-noto \
+        fonts-noto-color-emoji \
+        adwaita-icon-theme
+"
+
+# Servis engelini kaldır
+rm -f "$ROOTFS_TMP/usr/sbin/policy-rc.d"
+cleanup_mounts
+trap - EXIT
+
+print_ok "Masaüstü ortamı kuruldu."
 
 # Locale ayarla
 print_info "Türkçe dil desteği ayarlanıyor..."
