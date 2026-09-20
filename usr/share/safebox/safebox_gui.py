@@ -353,7 +353,24 @@ class SafeBoxGUI(Gtk.Window):
                         GLib.idle_add(self.append_log, f"[HATA] Kurulum başarısız oldu (Hata kodu: {s_proc.returncode}).")
                 threading.Thread(target=setup_thread, daemon=True).start()
         else:
-            self.append_log(f"[HATA] Hata kodu: {returncode}")
+            self.append_log(f"[HATA] Beklenmeyen kapanış (Hata kodu: {returncode})")
+            
+            # Hata detaylarını engine logundan çıkar
+            log_path = os.path.expanduser("~/.local/share/safebox/safebox-engine.log")
+            if os.path.exists(log_path):
+                try:
+                    with open(log_path, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
+                        # Hata olabilecek satırları yakala
+                        error_lines = [line.strip() for line in lines if "bwrap:" in line or "failed to exec" in line or "[HATA]" in line]
+                        if error_lines:
+                            self.append_log("--- Hata Detayı ---")
+                            # Sadece en son 3 hatayı göster
+                            for el in error_lines[-3:]:
+                                self.append_log(el)
+                            self.append_log("-------------------")
+                except Exception:
+                    pass
 
 def main():
     app = SafeBoxGUI()

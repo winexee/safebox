@@ -287,6 +287,12 @@ fi
 
 # X11 Socket
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
+BWRAP_ARGS+=(
+    --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
+    --ro-bind /usr/share/safebox/guest-init /home/safebox/.local/bin/guest-init
+    --die-with-parent
+    --new-session
+)
 
 echo "[BİLGİ] Sandbox başlatılıyor..." >> "$ENGINE_LOG"
 
@@ -294,15 +300,13 @@ echo "[BİLGİ] Sandbox başlatılıyor..." >> "$ENGINE_LOG"
 CPU_QUOTA_VAL=$((CPU_CORES * 100))
 
 if which systemd-run >/dev/null 2>&1; then
-    taskset -c "$CPU_AFFINITY" systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || {
+    taskset -c "$CPU_AFFINITY" systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /home/safebox/.local/bin/guest-init >> "$ENGINE_LOG" 2>&1 || {
         echo "[HATA] Sandbox başlatılamadı! systemd-run veya bwrap hatası." >> "$ENGINE_LOG"
-        kill $XEPHYR_PID 2>/dev/null
         exit 107
     }
 else
-    taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /usr/share/safebox/guest-init >> "$ENGINE_LOG" 2>&1 || {
+    taskset -c "$CPU_AFFINITY" bwrap "${BWRAP_ARGS[@]}" dbus-run-session -- /home/safebox/.local/bin/guest-init >> "$ENGINE_LOG" 2>&1 || {
         echo "[HATA] Sandbox başlatılamadı! bwrap hatası." >> "$ENGINE_LOG"
-        kill $XEPHYR_PID 2>/dev/null
         exit 107
     }
 fi
