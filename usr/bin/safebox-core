@@ -129,9 +129,10 @@ fi
 cleanup() {
     echo "[BİLGİ] Oturum kapatılıyor..." >> "$ENGINE_LOG"
     kill -9 "$XEPHYR_PID" 2>/dev/null || true
-    # X11 Lock dosyasını temizle
     rm -f "/tmp/.X${TARGET_DISP#:}-lock" 2>/dev/null || true
     rm -rf "/tmp/.X11-unix/X${TARGET_DISP#:}" 2>/dev/null || true
+    rm -f "/tmp/safebox-core.pid" 2>/dev/null || true
+    rm -f "/tmp/safebox.lock" 2>/dev/null || true
     echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Oturum Kapatıldı ===" >> "$ENGINE_LOG"
 }
 trap cleanup EXIT INT TERM
@@ -228,6 +229,7 @@ BWRAP_ARGS=(
     --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
     --tmpfs /usr/share/applications
     --ro-bind /usr/share/safebox/guest-apps /usr/share/applications
+    --ro-bind /usr/share/safebox/guest-apps /usr/share/safebox/guest-apps
     --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
     --die-with-parent
     --new-session

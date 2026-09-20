@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox RootFS Kurulum Betiği (v1.7.6)
+# SafeBox RootFS Kurulum Betiği (v1.7.10)
 # Bu betik sandbox için gerekli rootfs'i oluşturur.
 # Root (sudo) yetkisi gerektirir.
 set -euo pipefail
@@ -141,7 +141,7 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
 # Servis engelini kaldır
 rm -f "$ROOTFS_TMP/usr/sbin/policy-rc.d"
 cleanup_mounts
-trap - EXIT
+trap - ERR INT TERM EXIT
 
 print_ok "Masaüstü ortamı kuruldu."
 

@@ -15,17 +15,8 @@ Depends: ${misc:Depends},
          python3,
          python3-gi,
          gir1.2-gtk-3.0,
-         cinnamon-core,
-         cinnamon-session,
-         nemo,
-         xed,
-         gnome-terminal,
-         gnome-system-monitor,
-         firefox,
-         yaru-theme-icon,
-         yaru-theme-gtk,
+         debootstrap,
          policykit-1
-Recommends: debootstrap
 Description: Namespace tabanlı izole konteyner masaüstü ortamı
  SafeBox; Bubblewrap, Cinnamon ve Xephyr altyapısını birleştirerek 
  konteyner (namespace) izolasyonlu bir sanal masaüstü ortamı sunar.

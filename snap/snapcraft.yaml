@@ -7,7 +7,7 @@ description: |
   and wiped completely upon session exit.
 
 grade: stable
-confinement: strict
+confinement: classic
 base: core24
 
 apps:
