@@ -20,5 +20,9 @@ for app in browser home share terminal editor; do
     fi
 done
 
+# Temel masaüstü bileşenlerini başlat
+tint2 &
+pcmanfm --desktop &
+
 # Openbox oturum başlat
-exec dbus-run-session -- openbox-session
+exec dbus-run-session -- openbox
