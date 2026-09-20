@@ -24,15 +24,15 @@ done
 mkdir -p /home/safebox/.config/gtk-3.0
 cat > /home/safebox/.config/gtk-3.0/settings.ini << 'EOF'
 [Settings]
-gtk-theme-name=Adwaita
-gtk-icon-theme-name=Adwaita
+gtk-theme-name=Yaru
+gtk-icon-theme-name=Yaru
 gtk-font-name=Sans 10
 gtk-application-prefer-dark-theme=1
 EOF
 
 cat > /home/safebox/.gtkrc-2.0 << 'EOF'
-gtk-theme-name="Adwaita"
-gtk-icon-theme-name="Adwaita"
+gtk-theme-name="Yaru"
+gtk-icon-theme-name="Yaru"
 gtk-font-name="Sans 10"
 EOF
 
@@ -52,7 +52,7 @@ if which xsetroot >/dev/null 2>&1; then
 fi
 
 # Temel masaüstü bileşenlerini başlat
-tint2 &
+lxpanel &
 pcmanfm --desktop &
 
 # Openbox oturum başlat

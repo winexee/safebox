@@ -145,7 +145,7 @@ class SafeBoxGUI(Gtk.Window):
         cmd_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         cmd_lbl = Gtk.Label(label="Komut:")
         self.cmd_entry = Gtk.Entry()
-        self.cmd_entry.set_placeholder_text("developer, doctor, sysinfo, purge, clear")
+        self.cmd_entry.set_placeholder_text("Komut girmek için buraya yazın (yardım için: help)")
         self.cmd_entry.connect("activate", self.on_run_command)
         btn_run = Gtk.Button(label="Çalıştır")
         btn_run.connect("clicked", self.on_run_command)
@@ -171,6 +171,7 @@ class SafeBoxGUI(Gtk.Window):
         vbox.pack_start(bottom_box, False, False, 0)
 
         self.append_log(f"SafeBox Kontrol Merkezi Hazır (Sürüm: {VERSION}).")
+        self.append_log("Komut listesini görmek için 'help' yazabilirsiniz.")
 
     def append_log(self, text):
         buf = self.console_view.get_buffer()
@@ -190,55 +191,57 @@ class SafeBoxGUI(Gtk.Window):
         # Izin verilen komutlar (whitelist)
         ALLOWED_DEV_CMDS = {"uname", "whoami", "pwd", "ls", "echo", "date"}
         
-        if cmd == "clear":
+        if cmd == "help":
+            self.append_log(f"SafeBox Sürüm: {VERSION}")
+            self.append_log("--- Kullanılabilir Komutlar ---")
+            self.append_log("help    : Bu yardım menüsünü gösterir")
+            self.append_log("status  : SafeBox durumunu gösterir")
+            self.append_log("sysinfo : Sistem bilgilerini gösterir")
+            self.append_log("purge   : Önbelleği temizler")
+            self.append_log("clear   : Konsol ekranını temizler")
+        elif cmd == "clear":
             self.console_view.get_buffer().set_text("")
         elif cmd == "developer":
             self.dev_mode = not self.dev_mode
             st = "AÇIK" if self.dev_mode else "KAPALI"
             self.append_log(f"Geliştirici Modu: {st}")
-            self.append_log("İzin verilen komutlar: uname, whoami, pwd, ls, echo, date")
+            self.append_log("Geliştirici komutları aktif. (test, test ultra ve sistem komutları: uname, vb.)")
         elif cmd == "status":
-            self.append_log("SafeBox Durumu: Hazır\nMasaüstü: Cinnamon")
+            self.append_log("SafeBox Durumu: Hazır\nMasaüstü: Openbox")
         elif cmd == "sysinfo":
-            self.append_log(f"SafeBox Sürüm: {VERSION}\nMasaüstü: Cinnamon 2D")
+            self.append_log(f"SafeBox Sürüm: {VERSION}\nMasaüstü: Openbox")
         elif cmd == "purge":
             try:
                 import glob
-
-                targets = glob.glob(
-                    os.path.expanduser("~/.local/share/safebox/mock_*")
-                )
-
+                targets = glob.glob(os.path.expanduser("~/.local/share/safebox/mock_*"))
                 for target in targets:
-                    subprocess.run(
-                        ["rm", "-rf", "--", target],
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                        check=False,
-                    )
-
-                self.append_log(
-                    f"Önbellek temizlendi. Öğeler: {len(targets)}"
-                )
+                    subprocess.run(["rm", "-rf", "--", target], capture_output=True, text=True, timeout=5, check=False)
+                self.append_log(f"Önbellek temizlendi. Öğeler: {len(targets)}")
             except Exception as e:
                 self.append_log(f"[HATA] Purge başarısız: {e}")
-        elif cmd == "doctor":
-            self.append_log("[🔍 SISTEM TESTİ BAŞLANIYOR]")
+        elif cmd == "test" or cmd == "test ultra":
+            if not self.dev_mode:
+                self.append_log("Bu komutu kullanabilmek için Geliştirici Modu (developer) aktif olmalıdır.")
+                return
+            
+            is_ultra = (cmd == "test ultra")
+            self.append_log("[🔍 SİSTEM TESTİ BAŞLANIYOR]")
             tests_passed = 0
             tests_total = 0
+            errors = []
             
-            # Test 1: RootFS kontrolü (Derin Doğrulama)
+            # Test 1: RootFS kontrolü
             tests_total += 1
             if os.path.exists("/var/lib/safebox/rootfs/.safebox-rootfs-complete") and os.path.exists("/var/lib/safebox/rootfs/usr/bin/openbox"):
-                self.append_log("✓ RootFS: Tam ve eksiksiz kurulu (.safebox-rootfs-complete ve çalıştırılabilir ortam)")
+                self.append_log("✓ RootFS: Tam ve eksiksiz kurulu.")
                 tests_passed += 1
             else:
-                self.append_log("✗ RootFS: Eksik veya hatalı kurulum (sudo safebox-setup gerekli)")
+                msg = "✗ RootFS: Eksik veya hatalı kurulum (sudo safebox-setup gerekli)"
+                self.append_log(msg)
+                errors.append(msg)
             
             # Test 2: SafeBox-Core Çalışıyor mu?
             tests_total += 1
-            # Önce systemd scope'u kontrol et
             try:
                 unit_pid_res = subprocess.run(["systemctl", "--user", "show", "safebox-app.scope", "--property=MainPID"], capture_output=True, text=True, timeout=2)
                 sandbox_pid = None
@@ -246,29 +249,39 @@ class SafeBoxGUI(Gtk.Window):
                     sandbox_pid = unit_pid_res.stdout.split("=")[1].strip()
                 
                 if sandbox_pid and sandbox_pid != "0":
-                    self.append_log(f"✓ Arka Plan Süreci: safebox-app.scope aktif (MainPID: {sandbox_pid})")
+                    self.append_log(f"✓ Arka Plan Süreci: Aktif (PID: {sandbox_pid})")
                     tests_passed += 1
                     
-                    # Test 3: Cgroup Limiti (Gerçek Sandbox Kapsamı)
+                    # Test 3: Cgroup Limiti
                     tests_total += 1
                     try:
                         cgroup_path = subprocess.run(["cat", f"/proc/{sandbox_pid}/cgroup"], capture_output=True, text=True, timeout=2).stdout
                         if "safebox-app.scope" in cgroup_path:
-                            self.append_log("✓ Kaynak Sınırları: Süreç başarıyla izole edilmiş Cgroup içinde çalışıyor (safebox-app.scope)")
+                            self.append_log("✓ Kaynak Sınırları: Süreç izole edilmiş Cgroup içinde.")
                             tests_passed += 1
                         else:
-                            self.append_log(f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})")
+                            msg = f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})"
+                            self.append_log(msg)
+                            errors.append(msg)
                     except Exception as e:
-                        self.append_log(f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})")
+                        msg = f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})"
+                        if is_ultra: self.append_log(msg)
+                        errors.append(msg)
                 else:
-                    self.append_log("ℹ Arka Plan Süreci: Çalışan bir SafeBox oturumu yok")
+                    self.append_log("ℹ Arka Plan Süreci: Çalışan bir oturum yok")
             except Exception as e:
-                self.append_log(f"✗ Arka Plan Kontrolü: {e}")
+                msg = f"✗ Arka Plan Kontrolü hatası: {e}"
+                if is_ultra: self.append_log(msg)
+                errors.append(msg)
             
             # Sonuç
             if tests_total > 0:
-                percentage = int((tests_passed / tests_total) * 100)
-                self.append_log(f"\n[SONUÇ] {tests_passed}/{tests_total} test geçti")
+                self.append_log(f"\n[SONUÇ] {tests_passed}/{tests_total} test geçti.")
+                if is_ultra and errors:
+                    self.append_log("--- Ultra Detaylı Hata Listesi ---")
+                    for err in errors:
+                        self.append_log(err)
+                    self.append_log("----------------------------------")
             else:
                 self.append_log("\n[SONUÇ] Test yapılamadı.")
         else:
@@ -279,24 +292,18 @@ class SafeBoxGUI(Gtk.Window):
                 
                 if base_cmd not in ALLOWED_DEV_CMDS:
                     self.append_log(f"[HATA] '{base_cmd}' komutuna izin yok!")
-                    self.append_log(f"İzin verilen komutlar: {', '.join(ALLOWED_DEV_CMDS)}")
+                    self.append_log(f"İzin verilen sistem komutları: {', '.join(ALLOWED_DEV_CMDS)}")
                     return
                 
                 try:
-                    # Shell=False ile argümanları Array olarak geç (GÜVENLI)
                     res = subprocess.run(cmd_parts, capture_output=True, text=True, timeout=5)
-                    if res.stdout:
-                        self.append_log(res.stdout.strip())
-                    if res.stderr:
-                        self.append_log(f"[STDERR] {res.stderr.strip()}")
-                    if res.returncode != 0:
-                        self.append_log(f"[UYARI] Çıkış kodu: {res.returncode}")
-                except subprocess.TimeoutExpired:
-                    self.append_log("[HATA] Komut zaman aşımına uğradı (5s)")
+                    if res.stdout: self.append_log(res.stdout.strip())
+                    if res.stderr: self.append_log(f"[STDERR] {res.stderr.strip()}")
+                    if res.returncode != 0: self.append_log(f"[UYARI] Çıkış kodu: {res.returncode}")
                 except Exception as e:
                     self.append_log(f"[HATA] {e}")
             else:
-                self.append_log("Geçersiz komut. (İzin verilenler: developer, doctor, sysinfo, purge, clear)")
+                self.append_log("Geçersiz komut. Komutları görmek için 'help' yazın.")
 
     def on_start_sandbox(self, widget):
         ram = self.ram_combo.get_active_text().split()[0]

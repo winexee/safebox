@@ -129,7 +129,7 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
     # Temel masaüstü ortamı (bağımlılık sorunu olmayan paketler)
     apt-get install -y --no-install-recommends \
         openbox \
-        tint2 \
+        lxpanel \
         pcmanfm \
         xterm \
         gedit \
@@ -137,7 +137,8 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
         dbus-x11 \
         locales \
         fonts-noto \
-        adwaita-icon-theme \
+        yaru-theme-icon \
+        yaru-theme-gtk \
         xdg-utils \
         libgtk-3-0 \
         gvfs \
