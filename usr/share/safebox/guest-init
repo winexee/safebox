@@ -4,8 +4,8 @@ export USER=safebox
 export LOGNAME=safebox
 
 export XDG_DATA_DIRS=/usr/local/share:/usr/share
-export XDG_CURRENT_DESKTOP=OPENBOX
-export DESKTOP_SESSION=openbox
+export XDG_CURRENT_DESKTOP=X-Cinnamon
+export DESKTOP_SESSION=cinnamon
 export LIBGL_ALWAYS_SOFTWARE=1
 export GIO_USE_VFS=local
 export GVFS_DISABLE_FUSE=1

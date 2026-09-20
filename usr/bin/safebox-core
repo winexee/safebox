@@ -18,7 +18,7 @@ ETC_MOCK_DIR="${LOG_DIR}/mock_etc"
 ENGINE_LOG="${LOG_DIR}/safebox-engine.log"
 mkdir -p "$LOG_DIR" "$PROC_MOCK_DIR" "$SYS_MOCK_DIR/devices/system/cpu" "$ETC_MOCK_DIR"
 
-if [ ! -f "$ROOTFS/.safebox-rootfs-complete" ] || [ ! -x "$ROOTFS/bin/bash" ] || [ ! -x "$ROOTFS/usr/bin/openbox" ]; then
+if [ ! -f "$ROOTFS/.safebox-rootfs-complete" ] || [ ! -x "$ROOTFS/bin/bash" ] || [ ! -x "$ROOTFS/usr/bin/cinnamon" ]; then
     echo "[HATA] RootFS eksik, bozuk veya temel bileşenler eksik: $ROOTFS" >> "$ENGINE_LOG"
     exit 105
 fi
@@ -31,7 +31,7 @@ if ! flock -n 9; then
     exit 106
 fi
 
-# Doctor testi için PID kaydet
+# Test sistemi için PID kaydet
 echo $$ > "/tmp/safebox-core.pid"
 
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.20 Başlatılıyor ===" > "$ENGINE_LOG"

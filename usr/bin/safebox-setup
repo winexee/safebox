@@ -148,6 +148,22 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
     rm -rf /var/lib/apt/lists/*
 "
 
+# RootFS bileşenlerini doğrulama
+print_info "Cinnamon bileşenleri doğrulanıyor..."
+MISSING_BIN=""
+for bin in cinnamon cinnamon-session nemo gnome-terminal gnome-system-monitor gedit epiphany-browser dbus-daemon; do
+    if [ ! -f "$ROOTFS_TMP/usr/bin/$bin" ] && [ ! -f "$ROOTFS_TMP/bin/$bin" ]; then
+        MISSING_BIN="$MISSING_BIN $bin"
+    fi
+done
+
+if [ -n "$MISSING_BIN" ]; then
+    print_error "Eksik bileşenler tespit edildi: $MISSING_BIN"
+    print_error "Kurulum başarısız oldu!"
+    exit 1
+fi
+print_ok "Tüm Cinnamon bileşenleri başarıyla kuruldu."
+
 # Servis engelini kaldır
 rm -f "$ROOTFS_TMP/usr/sbin/policy-rc.d"
 cleanup_mounts

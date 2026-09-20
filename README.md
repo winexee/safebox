@@ -1,4 +1,4 @@
-# 🛡️ SafeBox - İzole Konteyner Masaüstü (Openbox/LXPanel)
+# 🛡️ SafeBox - İzole Konteyner Masaüstü (Cinnamon)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04%20LTS-orange.svg)](https://ubuntu.com/)
@@ -22,16 +22,16 @@ SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinm
 * **Sistem Dosyası Koruma:** Host sistem dosyaları sandbox'a bağlanmaz. Kendi izole `debootstrap` rootfs'i kullanılır.
 
 ### 🖥️ Kullanıcı Deneyimi
-* **Openbox/LXPanel Masaüstü:** Sade, anlaşılır ve bilindik masaüstü arayüzü.
+* **Cinnamon Masaüstü:** Sade, anlaşılır ve bilindik masaüstü arayüzü.
 * **Pratik Otomatik Kurulum:** Tek tuşla `safebox-setup` tetiklenerek gerekli RootFS hazırlanır.
 * **GTK3 Kontrol Merkezi:** RAM limiti, işlemci limiti ve ağ erişimi gibi temel izinleri yönetin.
 
 ### 📦 Standart İçerik (RootFS)
 * **Epiphany:** Web tarayıcısı
-* **PCManFM:** Dosya yöneticisi
+* **Nemo:** Dosya yöneticisi
 * **XTerm:** Komut satırı
 * **Gedit:** Metin düzenleyici
-* **LXTask:** Kaynak takibi
+* **GNOME System Monitor:** Kaynak takibi
 
 ---
 
@@ -62,7 +62,7 @@ SafeBox'ın çalışabilmesi için izole dosya sisteminin oluşturulması gereki
 ```bash
 sudo safebox-setup
 ```
-*(Bu işlem internet hızınıza bağlı olarak birkaç dakika sürebilir. Openbox/LXPanel tabanlı minimal bir Ubuntu sistemi `/var/lib/safebox/rootfs` dizinine kurulur.)*
+*(Bu işlem internet hızınıza bağlı olarak birkaç dakika sürebilir. Cinnamon tabanlı minimal bir Ubuntu sistemi `/var/lib/safebox/rootfs` dizinine kurulur.)*
 
 ---
 
@@ -85,7 +85,7 @@ safebox
 
 ### Sistem Testi (Doctor)
 
-Konsol sekmesinden "doctor" komutunu çalıştırdığınızda şu gerçek zamanlı kontroller yapılır:
+Konsol sekmesinden "test" komutunu çalıştırdığınızda şu gerçek zamanlı kontroller yapılır:
 1. RootFS'in düzgün kurulup kurulmadığı.
 2. Arka planda aktif bir SafeBox sürecinin olup olmadığı.
 3. Cgroup v2 bellek ve işlemci kısıtlamalarının başarıyla uygulanıp uygulanmadığı.
