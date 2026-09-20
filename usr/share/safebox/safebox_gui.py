@@ -230,7 +230,7 @@ class SafeBoxGUI(Gtk.Window):
             
             # Test 1: RootFS kontrolü (Derin Doğrulama)
             tests_total += 1
-            if os.path.exists("/var/lib/safebox/rootfs/.safebox-rootfs-complete") and os.path.exists("/var/lib/safebox/rootfs/usr/bin/cinnamon-session"):
+            if os.path.exists("/var/lib/safebox/rootfs/.safebox-rootfs-complete") and os.path.exists("/var/lib/safebox/rootfs/usr/bin/openbox"):
                 self.append_log("✓ RootFS: Tam ve eksiksiz kurulu (.safebox-rootfs-complete ve çalıştırılabilir ortam)")
                 tests_passed += 1
             else:
