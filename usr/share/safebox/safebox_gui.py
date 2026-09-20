@@ -488,7 +488,8 @@ class SafeBoxGUI(Gtk.Window):
                         self.append_log("  ⚠ Namespace: UNKNOWN")
                         self.append_log("  ⚠ Filesystem: UNKNOWN")
                         self.append_log("  ⚠ Hostname: UNKNOWN")
-                        tests_unknown += 12 # 2 limit + 1 affinity + 6 ns + 1 mount + 1 dev + 1 uts
+                        tests_total += 12
+                        tests_unknown += 12
             except Exception as e:
                 msg = f"✗ Arka Plan Kontrolü hatası: {e}"
                 if is_ultra: self.append_log(msg)
