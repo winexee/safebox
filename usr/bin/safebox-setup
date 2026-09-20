@@ -134,6 +134,11 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
         gnome-system-monitor \
         gedit \
         epiphany-browser \
+        adwaita-icon-theme \
+        dmz-cursor-theme \
+        gnome-themes-extra \
+        fonts-liberation \
+        dconf-cli \
         dbus-x11 \
         locales \
         fonts-noto \

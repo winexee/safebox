@@ -403,11 +403,16 @@ class SafeBoxGUI(Gtk.Window):
                                 
                             leaks = [f"/home/{current_user}", "/root", "/mnt", "/media"]
                             leak_found = False
-                            for leak in leaks:
-                                if f" {leak} " in mountinfo or f" {leak}/" in mountinfo:
-                                    leak_found = True
-                                    self.append_log(f"  ✗ Mountinfo: Host {leak} dizini SIZMIŞ!")
-                                    errors.append(f"Host {leak} sızıntısı!")
+                            for line in mountinfo.split("\n"):
+                                parts = line.split()
+                                if len(parts) >= 5:
+                                    root_path = parts[3]
+                                    for leak in leaks:
+                                        if root_path == leak or root_path == f"{leak}/":
+                                            leak_found = True
+                                            self.append_log(f"  ✗ Mountinfo: Host {leak} dizini SIZMIŞ! ({root_path})")
+                                            errors.append(f"Host {leak} sızıntısı!")
+                            
                             
                             if not leak_found:
                                 self.append_log("  ✓ Mountinfo: Host özel dizinleri (/home, /root, vb.) izole.")
@@ -470,7 +475,7 @@ class SafeBoxGUI(Gtk.Window):
                         # 4. Hostname
                         tests_total += 1
                         try:
-                            hostname_check = subprocess.run(["nsenter", "-m", "-u", "-U", "-t", str(sandbox_pid), "hostname"], capture_output=True, text=True).stdout.strip()
+                            hostname_check = subprocess.run(["nsenter", "-m", "-u", "-U", "-t", str(sandbox_pid), "cat", "/proc/sys/kernel/hostname"], capture_output=True, text=True).stdout.strip()
                             if hostname_check == "safebox-sandbox":
                                 self.append_log("  ✓ UTS: Hostname 'safebox-sandbox' olarak doğrulandı.")
                                 tests_passed += 1

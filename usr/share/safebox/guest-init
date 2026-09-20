@@ -24,20 +24,30 @@ done
 mkdir -p /home/safebox/.config/gtk-3.0
 cat > /home/safebox/.config/gtk-3.0/settings.ini << 'EOF'
 [Settings]
-gtk-theme-name=Yaru
-gtk-icon-theme-name=Yaru
+gtk-theme-name=Adwaita
+gtk-icon-theme-name=Adwaita
 gtk-font-name=Sans 10
 gtk-application-prefer-dark-theme=1
 EOF
 
 cat > /home/safebox/.gtkrc-2.0 << 'EOF'
-gtk-theme-name="Yaru"
-gtk-icon-theme-name="Yaru"
+gtk-theme-name="Adwaita"
+gtk-icon-theme-name="Adwaita"
 gtk-font-name="Sans 10"
 EOF
 
 export CINNAMON_SOFTWARE_RENDERING=1
 export LIBGL_ALWAYS_SOFTWARE=1
 
+
+# Masaüstü ve Tema ayarları (GSettings)
+dconf write /org/cinnamon/desktop/background/picture-uri "'none'" || true
+dconf write /org/cinnamon/desktop/background/primary-color "'#2b2b2b'" || true
+dconf write /org/cinnamon/desktop/background/color-shading-type "'solid'" || true
+dconf write /org/cinnamon/desktop/interface/cursor-theme "'DMZ-White'" || true
+dconf write /org/cinnamon/desktop/interface/gtk-theme "'Adwaita'" || true
+dconf write /org/cinnamon/desktop/interface/icon-theme "'Adwaita'" || true
+
 # Temel masaüstü bileşenlerini başlat (Cinnamon'un DBus oturumu ile başlaması gerekir)
+
 exec dbus-run-session -- cinnamon-session
