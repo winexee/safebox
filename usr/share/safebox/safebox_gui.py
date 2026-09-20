@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SafeBox Control Center - v1.7.20
+SafeBox Control Center - v1.7.24
 Original Classic UI & Cinnamon Integration
 """
 
@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.7.20"
+VERSION = "1.7.24"
 
 class SafeBoxGUI(Gtk.Window):
     def __init__(self):
@@ -345,8 +345,15 @@ class SafeBoxGUI(Gtk.Window):
                                         status_lines = sf.readlines()
                                     cpus_allowed = [line.split(":")[1].strip() for line in status_lines if line.startswith("Cpus_allowed_list")]
                                     if cpus_allowed:
-                                        self.append_log(f"  ✓ CPU Affinity: Çalışabilir CPU'lar izole ({cpus_allowed[0]})")
-                                        tests_passed += 1
+                                        # Calculate expected affinity
+                                        selected_cpu_cores = int(self.cpu_combo.get_active_text().split()[0])
+                                        expected_affinity = f"0-{selected_cpu_cores - 1}" if selected_cpu_cores > 1 else "0"
+                                        if cpus_allowed[0] == expected_affinity:
+                                            self.append_log(f"  ✓ CPU Affinity: Çalışabilir CPU'lar tam doğrulandı ({cpus_allowed[0]})")
+                                            tests_passed += 1
+                                        else:
+                                            self.append_log(f"  ✗ CPU Affinity Sızıntısı: Beklenen: {expected_affinity}, Bulunan: {cpus_allowed[0]}")
+                                            errors.append(f"CPU Affinity Yanlış: Beklenen {expected_affinity}, Bulunan {cpus_allowed[0]}")
                                     else:
                                         self.append_log("  ⚠ CPU Affinity: Cpus_allowed_list bulunamadı.")
                                         tests_unknown += 1

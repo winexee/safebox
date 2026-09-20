@@ -1,3 +1,11 @@
+safebox (1.7.24-1) stable; urgency=high
+
+  * Complete sandbox architecture overhaul.
+  * Fail-closed cgroups and dbus isolation.
+  * Cinnamon rendering and theme fixes.
+
+ -- Mehmet Akif Sahin <mehmet-akif@localhost>  Sun, 20 Sep 2026 16:53:06 +0300
+
 safebox (1.7.20-1) stable; urgency=medium
 
   * Updated version to 1.7.20

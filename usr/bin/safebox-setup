@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox RootFS Kurulum Betiği (v1.7.20)
+# SafeBox RootFS Kurulum Betiği (v1.7.24)
 # Bu betik sandbox için gerekli rootfs'i oluşturur.
 # Root (sudo) yetkisi gerektirir.
 set -euo pipefail

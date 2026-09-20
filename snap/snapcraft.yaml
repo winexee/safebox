@@ -1,5 +1,5 @@
 name: safebox
-version: '1.7.20'
+version: '1.7.24'
 summary: Namespace-based, RAM-backed lightweight sandbox environment
 description: |
   SafeBox creates a volatile, namespace-based desktop sandbox environment with Bubblewrap.
