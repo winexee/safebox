@@ -20,6 +20,37 @@ for app in browser home share terminal editor; do
     fi
 done
 
+# GTK Tema ve İkon Ayarları (Görünümün düzelmesi için)
+mkdir -p /home/safebox/.config/gtk-3.0
+cat > /home/safebox/.config/gtk-3.0/settings.ini << 'EOF'
+[Settings]
+gtk-theme-name=Adwaita
+gtk-icon-theme-name=Adwaita
+gtk-font-name=Sans 10
+gtk-application-prefer-dark-theme=1
+EOF
+
+cat > /home/safebox/.gtkrc-2.0 << 'EOF'
+gtk-theme-name="Adwaita"
+gtk-icon-theme-name="Adwaita"
+gtk-font-name="Sans 10"
+EOF
+
+# PCManFM Arkaplan Ayarı (Masaüstü siyah kalmasın diye)
+mkdir -p /home/safebox/.config/pcmanfm/default
+cat > /home/safebox/.config/pcmanfm/default/desktop-items-0.conf << 'EOF'
+[*]
+wallpaper_mode=color
+desktop_bg=#2c3e50
+desktop_shadow=#000000
+desktop_fg=#ffffff
+EOF
+
+# Güzel bir arkaplan rengi ayarla (pcmanfm devreye girene kadar veya yerine)
+if which xsetroot >/dev/null 2>&1; then
+    xsetroot -solid "#2c3e50"
+fi
+
 # Temel masaüstü bileşenlerini başlat
 tint2 &
 pcmanfm --desktop &
