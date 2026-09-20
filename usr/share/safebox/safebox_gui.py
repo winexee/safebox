@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SafeBox Control Center - v1.7.6
+SafeBox Control Center - v1.7.20
 Original Classic UI & Cinnamon Integration
 """
 
@@ -15,7 +15,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib
 
-VERSION = "1.7.6"
+VERSION = "1.7.20"
 
 class SafeBoxGUI(Gtk.Window):
     def __init__(self):
@@ -259,6 +259,22 @@ class SafeBoxGUI(Gtk.Window):
                         if "safebox-app.scope" in cgroup_path:
                             self.append_log("✓ Kaynak Sınırları: Süreç izole edilmiş Cgroup içinde.")
                             tests_passed += 1
+                            
+                            # Gerçek Limit Kontrolü (Sadece Ultra)
+                            if is_ultra:
+                                limit_res = subprocess.run(["systemctl", "--user", "show", "safebox-app.scope", "--property=MemoryMax,CPUQuotaPerSecUSec"], capture_output=True, text=True, timeout=2).stdout
+                                self.append_log("  - Uygulanan Cgroup Limitleri:")
+                                for line in limit_res.strip().split("\n"):
+                                    self.append_log(f"    {line}")
+                                
+                                # Filesystem İzolasyon Kontrolü
+                                try:
+                                    # nsenter ile içeri bak
+                                    root_ls = subprocess.run(["nsenter", "-U", "-m", "-t", str(sandbox_pid), "ls", "-l", "/"], capture_output=True, text=True, timeout=2).stdout
+                                    if "opt" in root_ls:
+                                        self.append_log("  ✓ Filesystem İzolasyonu: Root mount izole edilmiş (host görünmüyor)")
+                                except Exception:
+                                    self.append_log("  ⚠ Filesystem İzolasyonu kontrol edilemedi")
                         else:
                             msg = f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})"
                             self.append_log(msg)

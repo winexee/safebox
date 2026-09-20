@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox Enterprise Hardened Engine (v1.7.6 - RootFS Hardened)
+# SafeBox Enterprise Hardened Engine (v1.7.20 - RootFS Hardened)
 set -euo pipefail
 
 RAM_GB="${1:-4}"
@@ -34,7 +34,7 @@ fi
 # Doctor testi için PID kaydet
 echo $$ > "/tmp/safebox-core.pid"
 
-echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.6 Başlatılıyor ===" > "$ENGINE_LOG"
+echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] SafeBox Engine v1.7.20 Başlatılıyor ===" > "$ENGINE_LOG"
 
 # 1. HATA DÜZELTMESİ: Çekirdek Kernel UUID Yedeği
 if which dbus-uuidgen >/dev/null 2>&1; then
@@ -45,7 +45,7 @@ fi
 
 cat << 'OS_EOF' > "${ETC_MOCK_DIR}/os-release"
 NAME="SafeBox OS"
-VERSION="1.7.6 (Hardened Sandbox)"
+VERSION="1.7.20 (Hardened Sandbox)"
 ID=safebox
 ID_LIKE=debian
 PRETTY_NAME="SafeBox Hardened Workspace"
@@ -132,7 +132,7 @@ cleanup() {
     rm -f "/tmp/.X${TARGET_DISP#:}-lock" 2>/dev/null || true
     rm -rf "/tmp/.X11-unix/X${TARGET_DISP#:}" 2>/dev/null || true
     rm -f "/tmp/safebox-core.pid" 2>/dev/null || true
-    rm -f "/tmp/safebox.lock" 2>/dev/null || true
+
     echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Oturum Kapatıldı ===" >> "$ENGINE_LOG"
 }
 trap cleanup EXIT INT TERM
@@ -287,12 +287,7 @@ fi
 
 # X11 Socket
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
-BWRAP_ARGS+=(
-    --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
-    --ro-bind /usr/share/safebox/guest-init /home/safebox/.local/bin/guest-init
-    --die-with-parent
-    --new-session
-)
+BWRAP_ARGS+=(--ro-bind /usr/share/safebox/guest-init /home/safebox/.local/bin/guest-init)
 
 echo "[BİLGİ] Sandbox başlatılıyor..." >> "$ENGINE_LOG"
 

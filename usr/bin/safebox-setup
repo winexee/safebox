@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SafeBox RootFS Kurulum Betiği (v1.7.10)
+# SafeBox RootFS Kurulum Betiği (v1.7.20)
 # Bu betik sandbox için gerekli rootfs'i oluşturur.
 # Root (sudo) yetkisi gerektirir.
 set -euo pipefail
@@ -130,6 +130,7 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
     apt-get install -y --no-install-recommends \
         openbox \
         lxpanel \
+        lxtask \
         pcmanfm \
         xterm \
         gedit \
@@ -197,7 +198,7 @@ echo ""
 echo "  Konum : $ROOTFS_DIR"
 echo "  Boyut : $ROOTFS_SIZE"
 echo "  Distro: Ubuntu $DISTRO (24.04 LTS)"
-echo "  DE    : Cinnamon"
+echo -e "  DE    : Openbox / LXPanel"
 echo ""
 echo "  Artık SafeBox'ı başlatabilirsiniz:"
 echo "    safebox"

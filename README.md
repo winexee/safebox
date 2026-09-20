@@ -1,8 +1,8 @@
-# 🛡️ SafeBox - İzole Konteyner Masaüstü (Cinnamon)
+# 🛡️ SafeBox - İzole Konteyner Masaüstü (Openbox/LXPanel)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04%20LTS-orange.svg)](https://ubuntu.com/)
-[![Release](https://img.shields.io/badge/Release-v1.7.6-brightgreen.svg)](https://github.com/winexee/safebox/releases)
+[![Release](https://img.shields.io/badge/Release-v1.7.20-brightgreen.svg)](https://github.com/winexee/safebox/releases)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Bash](https://img.shields.io/badge/Bash-5.0+-red.svg)](https://www.gnu.org/software/bash/)
 [![safebox](https://snapcraft.io/safebox/badge.svg)](https://snapcraft.io/safebox)
@@ -22,16 +22,16 @@ SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinm
 * **Sistem Dosyası Koruma:** Host sistem dosyaları sandbox'a bağlanmaz. Kendi izole `debootstrap` rootfs'i kullanılır.
 
 ### 🖥️ Kullanıcı Deneyimi
-* **Cinnamon Masaüstü:** Sade, anlaşılır ve bilindik masaüstü arayüzü.
+* **Openbox/LXPanel Masaüstü:** Sade, anlaşılır ve bilindik masaüstü arayüzü.
 * **Pratik Otomatik Kurulum:** Tek tuşla `safebox-setup` tetiklenerek gerekli RootFS hazırlanır.
 * **GTK3 Kontrol Merkezi:** RAM limiti, işlemci limiti ve ağ erişimi gibi temel izinleri yönetin.
 
 ### 📦 Standart İçerik (RootFS)
-* **Firefox:** Web tarayıcısı
-* **Nemo:** Dosya yöneticisi
-* **GNOME Terminal:** Komut satırı
-* **Xed:** Metin düzenleyici
-* **GNOME System Monitor:** Kaynak takibi
+* **Epiphany:** Web tarayıcısı
+* **PCManFM:** Dosya yöneticisi
+* **XTerm:** Komut satırı
+* **Gedit:** Metin düzenleyici
+* **LXTask:** Kaynak takibi
 
 ---
 
@@ -62,7 +62,7 @@ SafeBox'ın çalışabilmesi için izole dosya sisteminin oluşturulması gereki
 ```bash
 sudo safebox-setup
 ```
-*(Bu işlem internet hızınıza bağlı olarak birkaç dakika sürebilir. Cinnamon tabanlı minimal bir Ubuntu sistemi `/var/lib/safebox/rootfs` dizinine kurulur.)*
+*(Bu işlem internet hızınıza bağlı olarak birkaç dakika sürebilir. Openbox/LXPanel tabanlı minimal bir Ubuntu sistemi `/var/lib/safebox/rootfs` dizinine kurulur.)*
 
 ---
 

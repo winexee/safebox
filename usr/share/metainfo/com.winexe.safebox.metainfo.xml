@@ -7,7 +7,7 @@
   <summary>Namespace Tabanlı İzole Konteyner Ortamı</summary>
   <description>
     <p>
-      SafeBox, Bubblewrap ve Cinnamon altyapısını kullanarak sistem dosyalarını 
+      SafeBox, Bubblewrap ve Openbox/LXPanel altyapısını kullanarak sistem dosyalarını 
       ve kişisel verileri ayrıştıran tek kullanımlık bir konteyner (namespace) sandbox ortamı sunar.
     </p>
   </description>
