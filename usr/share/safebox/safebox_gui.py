@@ -278,8 +278,13 @@ class SafeBoxGUI(Gtk.Window):
                             if pid_candidate:
                                 # Verify it's actually alive
                                 if os.path.exists(f"/proc/{pid_candidate}"):
-                                    sandbox_pid = pid_candidate
-                                    break
+                                    try:
+                                        with open(f"/proc/{pid_candidate}/cgroup", "r") as cgf:
+                                            if "safebox-app.scope" in cgf.read():
+                                                sandbox_pid = pid_candidate
+                                                break
+                                    except:
+                                        pass
                     except Exception:
                         pass
                     time.sleep(0.1)
@@ -456,10 +461,18 @@ class SafeBoxGUI(Gtk.Window):
                         tests_total += 1
                         try:
                             dev_access = subprocess.run(["nsenter", "-m", "-U", "-t", str(sandbox_pid), "ls", "/dev"], capture_output=True, text=True).stdout
-                            host_devs = ["sda", "nvme0n1", "dri", "nvidia"]
+                            import glob
+                            host_devs = []
+                            for bd in glob.glob("/sys/block/*"):
+                                bd_name = os.path.basename(bd)
+                                if not bd_name.startswith("loop") and not bd_name.startswith("ram"):
+                                    host_devs.append(bd_name)
+                            if os.path.exists("/dev/dri"): host_devs.append("dri")
+                            
                             dev_leak = False
                             for hd in host_devs:
-                                if hd in dev_access:
+                                # /dev altinda tam kelime eslesmesi (regex ile sinirlari belirle veya split ile)
+                                if hd in dev_access.split():
                                     dev_leak = True
                                     break
                             if dev_leak:

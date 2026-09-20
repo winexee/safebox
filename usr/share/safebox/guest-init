@@ -48,6 +48,10 @@ dconf write /org/cinnamon/desktop/interface/cursor-theme "'DMZ-White'" || true
 dconf write /org/cinnamon/desktop/interface/gtk-theme "'Adwaita'" || true
 dconf write /org/cinnamon/desktop/interface/icon-theme "'Adwaita'" || true
 
-# Temel masaüstü bileşenlerini başlat (Cinnamon'un DBus oturumu ile başlaması gerekir)
+
+# Host izolasyonunu sağlamak için sahte (mock) bir System DBus başlat (Cinnamon çökmesini engeller)
+mkdir -p /run/dbus
+dbus-daemon --session --address=unix:path=/run/dbus/system_bus_socket --nopidfile --syslog-only &
+\n# Temel masaüstü bileşenlerini başlat (Cinnamon'un DBus oturumu ile başlaması gerekir)
 
 exec dbus-run-session -- cinnamon-session

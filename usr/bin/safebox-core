@@ -318,19 +318,11 @@ if which systemd-run >/dev/null 2>&1; then
         run_success=1
     else
         echo "[HATA] systemd-run başarısız oldu (Hata Kodu: $RET)" >> "$ENGINE_LOG"
-        echo "[BİLGİ] Fallback: Doğrudan bwrap deneniyor..." >> "$ENGINE_LOG"
+        
     fi
 fi
 
 if [ $run_success -eq 0 ]; then
-    echo "[BİLGİ] Doğrudan bwrap ile deneniyor..." >> "$ENGINE_LOG"
-    exec 8> /tmp/safebox-bwrap.json
-    set +e
-    taskset -c "$CPU_AFFINITY" "${CMD_BWRAP[@]}" >> "$ENGINE_LOG" 2>&1
-    RET=$?
-    set -e
-    if [ $RET -ne 0 ]; then
-        echo "[HATA] bwrap başarısız oldu (Hata Kodu: $RET)" >> "$ENGINE_LOG"
-        exit 107
-    fi
+    echo "[HATA] Güvenlik politikası (Cgroup/systemd-run) uygulanamadığı için başlatma iptal edildi." >> "$ENGINE_LOG"
+    exit 107
 fi
