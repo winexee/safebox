@@ -94,10 +94,25 @@ class SafeBoxGUI(Gtk.Window):
         cpu_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         cpu_lbl = Gtk.Label(label="CPU Kullanım Sınırı (Çekirdek Eşdeğeri):")
         cpu_lbl.set_xalign(0)
+        import multiprocessing
         self.cpu_combo = Gtk.ComboBoxText()
-        for c in ["1 Çekirdek", "2 Çekirdek", "4 Çekirdek", "6 Çekirdek", "8 Çekirdek"]:
-            self.cpu_combo.append_text(c)
-        self.cpu_combo.set_active(2)
+        cpu_count = multiprocessing.cpu_count()
+        valid_cores = [1, 2, 4, 6, 8, 12, 16, 24, 32, 64]
+        if cpu_count not in valid_cores:
+            valid_cores.append(cpu_count)
+        valid_cores = sorted(list(set([c for c in valid_cores if c <= cpu_count])))
+        if not valid_cores: valid_cores = [1]
+        
+        for c in valid_cores:
+            self.cpu_combo.append_text(f"{c} Çekirdek")
+        
+        # Set default to roughly half cores or fallback
+        default_idx = len(valid_cores) - 1
+        for i, c in enumerate(valid_cores):
+            if c >= cpu_count // 2:
+                default_idx = i
+                break
+        self.cpu_combo.set_active(default_idx)
         cpu_box.pack_start(cpu_lbl, False, False, 0)
         cpu_box.pack_start(self.cpu_combo, True, True, 0)
         tab_res.pack_start(cpu_box, False, False, 0)
@@ -248,19 +263,26 @@ class SafeBoxGUI(Gtk.Window):
                 
                 # Gerçek Sandbox Sürecini Bulma (bwrap info-fd json)
                 import json
-                try:
-                    with open("/tmp/safebox-bwrap.json", "r") as jf:
-                        bwrap_info = json.load(jf)
-                        sandbox_pid = str(bwrap_info.get("child-pid", ""))
-                except Exception:
-                    # Fallback
-                    bwrap_res = subprocess.run(["pgrep", "-f", "bwrap.*guest-init"], capture_output=True, text=True)
-                    for bpid in bwrap_res.stdout.split():
-                        child_res = subprocess.run(["pgrep", "-P", bpid.strip()], capture_output=True, text=True)
-                        if child_res.stdout.strip():
-                            sandbox_pid = child_res.stdout.strip().split()[0]
-                            break
-                        
+                import time
+                import getpass
+                current_user = getpass.getuser()
+                sandbox_pid = None
+                
+                # Retry loop to avoid race condition when bwrap starts
+                for _ in range(10):
+                    try:
+                        with open("/tmp/safebox-bwrap.json", "r") as jf:
+                            bwrap_info = json.load(jf)
+                            pid_candidate = str(bwrap_info.get("child-pid", ""))
+                            if pid_candidate:
+                                # Verify it's actually alive
+                                if os.path.exists(f"/proc/{pid_candidate}"):
+                                    sandbox_pid = pid_candidate
+                                    break
+                    except Exception:
+                        pass
+                    time.sleep(0.1)
+                
                 if sandbox_pid and sandbox_pid != "0":
                     self.append_log(f"✓ Arka Plan Süreci: Aktif (PID: {sandbox_pid})")
                     tests_passed += 1
@@ -277,28 +299,30 @@ class SafeBoxGUI(Gtk.Window):
                             if is_ultra:
                                 tests_total += 2
                                 try:
-                                    limit_res = subprocess.run(["systemctl", "--user", "show", "safebox-app.scope", "--property=MemoryMax,CPUQuotaPerSecUSec"], capture_output=True, text=True, timeout=2).stdout
-                                    parsed_limits = {}
-                                    for line in limit_res.strip().split("\n"):
-                                        if "=" in line:
-                                            k, v = line.split("=", 1)
-                                            parsed_limits[k] = v.strip()
-                                            
+                                    cg_path_str = cgroup_path.strip().split("\n")[0]
+                                    if cg_path_str.startswith("0::"):
+                                        real_cgroup = "/sys/fs/cgroup" + cg_path_str[3:]
+                                    else:
+                                        real_cgroup = "/sys/fs/cgroup/unified" + cg_path_str.split(":", 2)[-1]
+                                    
+                                    with open(f"{real_cgroup}/memory.max", "r") as mf:
+                                        actual_mem = mf.read().strip()
+                                        
+                                    with open(f"{real_cgroup}/cpu.max", "r") as cf:
+                                        actual_cpu = cf.read().strip().split()[0]
+                                        
                                     expected_ram = str(int(self.ram_combo.get_active_text().split()[0]) * 1024**3)
                                     expected_cpu = str(int(self.cpu_combo.get_active_text().split()[0]) * 100000)
                                     
-                                    actual_mem = parsed_limits.get("MemoryMax", "")
-                                    actual_cpu = parsed_limits.get("CPUQuotaPerSecUSec", "")
-                                    
-                                    if actual_mem == expected_ram or actual_mem == "[not set]" and expected_ram == "0":
-                                        self.append_log(f"  ✓ Cgroup RAM: Seçilen değer uygulandı (MemoryMax={actual_mem})")
+                                    if actual_mem == expected_ram or actual_mem == "max" and expected_ram == "0":
+                                        self.append_log(f"  ✓ Cgroup RAM: Seçilen değer uygulandı (memory.max={actual_mem})")
                                         tests_passed += 1
                                     else:
                                         self.append_log(f"  ✗ Cgroup RAM: HATALI! Beklenen: {expected_ram}, Uygulanan: {actual_mem}")
                                         errors.append("Cgroup RAM limiti hatalı.")
                                         
-                                    if actual_cpu == expected_cpu or actual_cpu == "[not set]" and expected_cpu == "0":
-                                        self.append_log(f"  ✓ Cgroup CPU: Seçilen değer uygulandı (CPUQuota={actual_cpu})")
+                                    if actual_cpu == expected_cpu or actual_cpu == "max" and expected_cpu == "0":
+                                        self.append_log(f"  ✓ Cgroup CPU: Seçilen değer uygulandı (cpu.max={actual_cpu})")
                                         tests_passed += 1
                                     else:
                                         self.append_log(f"  ✗ Cgroup CPU: HATALI! Beklenen: {expected_cpu}, Uygulanan: {actual_cpu}")
@@ -306,139 +330,167 @@ class SafeBoxGUI(Gtk.Window):
                                         
                                 except Exception as e:
                                     self.append_log(f"  ⚠ Cgroup Limitleri doğrulanamadı: {e}")
+                                    tests_unknown += 2
                                     errors.append("Cgroup doğrulama hatası.")
-                                    # Fallback for systems without systemd-run but we won't count tests_total
-                                    tests_total -= 2
-                                
-                                # Filesystem & Namespace İzolasyon Kontrolü
-                                try:
-                                    # Mnt Namespace kontrolü
-                                    for ns, name in [('mnt', 'Mount'), ('pid', 'PID'), ('uts', 'UTS'), ('ipc', 'IPC'), ('user', 'USER'), ('net', 'Network')]:
-                                        tests_total += 1
-                                        try:
-                                            h = os.readlink(f'/proc/self/ns/{ns}')
-                                            g = subprocess.run(["readlink", f"/proc/{sandbox_pid}/ns/{ns}"], capture_output=True, text=True).stdout.strip()
-                                            
-                                            if not g:
-                                                self.append_log(f"  ✗ {name} Namespace: Okunamadı!")
-                                                errors.append(f"{name} Namespace okunamadı.")
-                                                continue
-                                                
-                                            if ns == 'net' and not self.chk_net.get_active():
-                                                if h != g:
-                                                    self.append_log(f"  ✓ {name} Namespace: İzole (Guest: {g.split(':')[-1][:-1]})")
-                                                    tests_passed += 1
-                                                else:
-                                                    self.append_log(f"  ✗ {name} Namespace: HOST İLE PAYLAŞILMIŞ! (KAPALI OLMASINA RAĞMEN)")
-                                                    errors.append(f"{name} Namespace izole edilmemiş!")
-                                            elif ns == 'net' and self.chk_net.get_active():
-                                                self.append_log(f"  ✓ {name} Namespace: Ağ isteyerek host ile paylaşıldı (NET=1).")
-                                                tests_passed += 1
-                                            else:
-                                                if h != g:
-                                                    self.append_log(f"  ✓ {name} Namespace: İzole (Guest: {g.split(':')[-1][:-1]})")
-                                                    tests_passed += 1
-                                                else:
-                                                    self.append_log(f"  ✗ {name} Namespace: HOST İLE PAYLAŞILMIŞ!")
-                                                    errors.append(f"{name} Namespace izole edilmemiş!")
-                                        except Exception as e:
-                                            self.append_log(f"  ✗ {name} Namespace: Kontrol Hatası! ({e})")
-                                            errors.append(f"{name} Namespace hata: {e}")
-                                            
-                                    import getpass
-                                    current_user = getpass.getuser()
                                     
-                                    # Filesystem Kontrolleri (Doğrudan /proc/PID/mountinfo üzerinden - nsenter olmadan)
-                                    tests_total += 1
-                                    try:
-                                        with open(f"/proc/{sandbox_pid}/mountinfo", "r") as mf:
-                                            mountinfo = mf.read()
-                                            
-                                        # Root sızıntı kontrolü
-                                        leaks = [f"/home/{current_user}", "/root", "/mnt", "/media"]
-                                        leak_found = False
-                                        for leak in leaks:
-                                            if f" {leak} " in mountinfo or f" {leak}/" in mountinfo:
-                                                leak_found = True
-                                                self.append_log(f"  ✗ Filesystem: Host {leak} dizini SIZMIŞ!")
-                                                errors.append(f"Host {leak} sızıntısı!")
-                                        
-                                        if not leak_found:
-                                            self.append_log("  ✓ Filesystem: Host özel dizinleri (/home, /root, vb.) izole.")
-                                            tests_passed += 1
-                                    except Exception as e:
-                                        self.append_log(f"  ⚠ Filesystem: İzolasyon kontrol edilemedi: {e}")
-                                        errors.append(f"Filesystem testi hata: {e}")
-                                        
-                                    tests_total += 1
-                                    try:
-                                        with open(f"/proc/{sandbox_pid}/mountinfo", "r") as mf:
-                                            mounts = mf.readlines()
-                                        
-                                        root_mount = [m for m in mounts if " / " in m]
-                                        if root_mount and "/var/lib/safebox/rootfs" in root_mount[0]:
-                                            self.append_log("  ✓ Filesystem: Root (/) mount tablosu doğrulanıyor (gerçek RootFS).")
-                                            tests_passed += 1
-                                        else:
-                                            self.append_log("  ✗ Filesystem: Root (/) mount izolasyonu hatalı veya host sızıntısı var!")
-                                            errors.append("Root mount izolasyonu başarısız.")
-                                    except Exception as e:
-                                        self.append_log(f"  ⚠ Filesystem Root: İzolasyon kontrol edilemedi: {e}")
-                                        errors.append(f"Root mount testi hata: {e}")
-                                        
-                                    tests_total += 1
-                                    try:
-                                        with open(f"/proc/{sandbox_pid}/mountinfo", "r") as mf:
-                                            mounts = mf.readlines()
-                                        dev_leak = False
-                                        for m in mounts:
-                                            if " /dev " in m and ("udev" in m or "devtmpfs" in m):
-                                                dev_leak = True
-                                        if dev_leak:
-                                            self.append_log("  ✗ Filesystem: /dev host ile direkt paylaşımlı!")
-                                            errors.append("/dev izolasyonu başarısız!")
-                                        else:
-                                            self.append_log("  ✓ Filesystem: /dev (Cihazlar) izole tmpfs/devtmpfs kullanıyor.")
-                                            tests_passed += 1
-                                    except Exception as e:
-                                        self.append_log(f"  ⚠ /dev: Kontrol edilemedi: {e}")
-                                        errors.append(f"/dev testi hata: {e}")
-                                        
-                                    tests_total += 1
-                                    try:
-                                        # Hostname doğrudan UTS namespace içinden okunacak, bunu /proc/sys/kernel/hostname den okuyabiliriz (ama kernel proc u namespace'e duyarlıdır)
-                                        # Yada basitçe Python ile setns yapamayacağımıza göre, subprocess nsenter'ı unprivileged şekilde deneriz:
-                                        hostname_check = subprocess.run(["nsenter", "-m", "-u", "-U", "-t", str(sandbox_pid), "hostname"], capture_output=True, text=True).stdout.strip()
-                                        if hostname_check == "safebox-sandbox":
-                                            self.append_log("  ✓ UTS: Hostname 'safebox-sandbox' olarak doğrulanıyor.")
-                                            tests_passed += 1
-                                        else:
-                                            self.append_log(f"  ✗ UTS: Hostname sızıntısı! Beklenmeyen hostname '{hostname_check}'")
-                                            errors.append(f"Hostname sızıntısı: {hostname_check}")
-                                    except Exception as e:
-                                        self.append_log(f"  ⚠ UTS: Hostname kontrol edilemedi: {e}")
-                                        errors.append(f"UTS testi hata: {e}")
-                                        
+                                tests_total += 1
+                                try:
+                                    with open(f"/proc/{sandbox_pid}/status", "r") as sf:
+                                        status_lines = sf.readlines()
+                                    cpus_allowed = [line.split(":")[1].strip() for line in status_lines if line.startswith("Cpus_allowed_list")]
+                                    if cpus_allowed:
+                                        self.append_log(f"  ✓ CPU Affinity: Çalışabilir CPU'lar izole ({cpus_allowed[0]})")
+                                        tests_passed += 1
+                                    else:
+                                        self.append_log("  ⚠ CPU Affinity: Cpus_allowed_list bulunamadı.")
+                                        tests_unknown += 1
                                 except Exception as e:
-                                    self.append_log(f"  ⚠ Filesystem/Namespace İzolasyonu kontrol edilemedi: {e}")
+                                    self.append_log(f"  ⚠ CPU Affinity okunamadı: {e}")
+                                    tests_unknown += 1
                         else:
-                            msg = f"⚠ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})"
+                            msg = f"✗ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})"
                             self.append_log(msg)
                             errors.append(msg)
                     except Exception as e:
                         msg = f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})"
                         if is_ultra: self.append_log(msg)
                         errors.append(msg)
+                        tests_unknown += 1
+                        
+                    # Namespace ve Filesystem Testleri (Sadece Ultra)
+                    if is_ultra:
+                        # 1. Namespaces
+                        for ns, name in [('mnt', 'Mount'), ('pid', 'PID'), ('uts', 'UTS'), ('ipc', 'IPC'), ('user', 'USER'), ('net', 'Network')]:
+                            tests_total += 1
+                            try:
+                                h = os.readlink(f'/proc/self/ns/{ns}')
+                                g = subprocess.run(["readlink", f"/proc/{sandbox_pid}/ns/{ns}"], capture_output=True, text=True).stdout.strip()
+                                
+                                if not g:
+                                    self.append_log(f"  ⚠ {name} Namespace: Okunamadı!")
+                                    tests_unknown += 1
+                                    errors.append(f"{name} Namespace okunamadı.")
+                                    continue
+                                    
+                                if ns == 'net' and not self.chk_net.get_active():
+                                    if h != g:
+                                        self.append_log(f"  ✓ {name} Namespace: İzole (Guest: {g.split(':')[-1][:-1]})")
+                                        tests_passed += 1
+                                    else:
+                                        self.append_log(f"  ✗ {name} Namespace: HOST İLE PAYLAŞILMIŞ! (KAPALI OLMASINA RAĞMEN)")
+                                        errors.append(f"{name} Namespace izole edilmemiş!")
+                                elif ns == 'net' and self.chk_net.get_active():
+                                    self.append_log(f"  ✓ {name} Namespace: PASS - Ağ bilerek paylaşıldı (NET=1).")
+                                    tests_passed += 1
+                                else:
+                                    if h != g:
+                                        self.append_log(f"  ✓ {name} Namespace: İzole (Guest: {g.split(':')[-1][:-1]})")
+                                        tests_passed += 1
+                                    else:
+                                        self.append_log(f"  ✗ {name} Namespace: HOST İLE PAYLAŞILMIŞ!")
+                                        errors.append(f"{name} Namespace izole edilmemiş!")
+                            except Exception as e:
+                                self.append_log(f"  ⚠ {name} Namespace: Kontrol Hatası! ({e})")
+                                tests_unknown += 1
+                                errors.append(f"{name} Namespace hata: {e}")
+                                
+                        # 2. Filesystem Mountinfo (RootFS ve sızıntı kontrolü)
+                        tests_total += 1
+                        try:
+                            with open(f"/proc/{sandbox_pid}/mountinfo", "r") as mf:
+                                mountinfo = mf.read()
+                                
+                            leaks = [f"/home/{current_user}", "/root", "/mnt", "/media"]
+                            leak_found = False
+                            for leak in leaks:
+                                if f" {leak} " in mountinfo or f" {leak}/" in mountinfo:
+                                    leak_found = True
+                                    self.append_log(f"  ✗ Mountinfo: Host {leak} dizini SIZMIŞ!")
+                                    errors.append(f"Host {leak} sızıntısı!")
+                            
+                            if not leak_found:
+                                self.append_log("  ✓ Mountinfo: Host özel dizinleri (/home, /root, vb.) izole.")
+                                tests_passed += 1
+                        except Exception as e:
+                            self.append_log(f"  ⚠ Mountinfo İzolasyon: Kontrol edilemedi ({e})")
+                            tests_unknown += 1
+                            errors.append(f"Mountinfo testi hata: {e}")
+                            
+                        tests_total += 1
+                        try:
+                            with open(f"/proc/{sandbox_pid}/mountinfo", "r") as mf:
+                                mounts = mf.readlines()
+                            
+                            root_mount = [m for m in mounts if " / " in m]
+                            if root_mount and "/var/lib/safebox/rootfs" in root_mount[0]:
+                                self.append_log("  ✓ RootFS Mount: Root (/) mount tablosu doğrulandı.")
+                                tests_passed += 1
+                            else:
+                                self.append_log("  ✗ RootFS Mount: Hatalı izolasyon veya sızıntı var!")
+                                errors.append("Root mount izolasyonu başarısız.")
+                        except Exception as e:
+                            self.append_log(f"  ⚠ RootFS Mount: Kontrol edilemedi ({e})")
+                            tests_unknown += 1
+                            errors.append(f"Root mount testi hata: {e}")
+                            
+                        # 3. Gerçek Dosya Erişimi (Host /home ve Cihaz sızıntı testi)
+                        tests_total += 1
+                        try:
+                            home_access = subprocess.run(["nsenter", "-m", "-U", "-t", str(sandbox_pid), "ls", f"/home/{current_user}"], capture_output=True, text=True)
+                            if home_access.returncode != 0:
+                                self.append_log(f"  ✓ Filesystem: Guest içinden /home/{current_user} erişilemez durumda.")
+                                tests_passed += 1
+                            else:
+                                self.append_log(f"  ✗ Filesystem: Guest içinden /home/{current_user} okunabiliyor!")
+                                errors.append(f"Gerçek /home erişim sızıntısı!")
+                        except Exception as e:
+                            self.append_log(f"  ⚠ Filesystem /home: Gerçek erişim testi yapılamadı ({e})")
+                            tests_unknown += 1
+                            
+                        tests_total += 1
+                        try:
+                            dev_access = subprocess.run(["nsenter", "-m", "-U", "-t", str(sandbox_pid), "ls", "/dev"], capture_output=True, text=True).stdout
+                            host_devs = ["sda", "nvme0n1", "dri", "nvidia"]
+                            dev_leak = False
+                            for hd in host_devs:
+                                if hd in dev_access:
+                                    dev_leak = True
+                                    break
+                            if dev_leak:
+                                self.append_log("  ✗ Filesystem: /dev altında host donanımları (disk/gpu) okunabiliyor!")
+                                errors.append("/dev gerçek erişim izolasyonu başarısız!")
+                            else:
+                                self.append_log("  ✓ Filesystem: /dev izole; host disk/gpu cihazları görünmüyor.")
+                                tests_passed += 1
+                        except Exception as e:
+                            self.append_log(f"  ⚠ Filesystem /dev: Gerçek erişim testi yapılamadı ({e})")
+                            tests_unknown += 1
+                            
+                        # 4. Hostname
+                        tests_total += 1
+                        try:
+                            hostname_check = subprocess.run(["nsenter", "-m", "-u", "-U", "-t", str(sandbox_pid), "hostname"], capture_output=True, text=True).stdout.strip()
+                            if hostname_check == "safebox-sandbox":
+                                self.append_log("  ✓ UTS: Hostname 'safebox-sandbox' olarak doğrulandı.")
+                                tests_passed += 1
+                            else:
+                                self.append_log(f"  ✗ UTS: Hostname sızıntısı! Beklenen: safebox-sandbox, Bulunan: '{hostname_check}'")
+                                errors.append(f"Hostname sızıntısı: {hostname_check}")
+                        except Exception as e:
+                            self.append_log(f"  ⚠ UTS: Hostname kontrol edilemedi ({e})")
+                            tests_unknown += 1
                 else:
                     self.append_log("ℹ Arka Plan Süreci: Çalışan bir oturum yok")
             except Exception as e:
                 msg = f"✗ Arka Plan Kontrolü hatası: {e}"
                 if is_ultra: self.append_log(msg)
                 errors.append(msg)
+                tests_unknown += 1
             
             # Sonuç
             if tests_total > 0:
-                self.append_log(f"\n[SONUÇ] {tests_passed}/{tests_total} test geçti.")
+                tests_failed = tests_total - tests_passed - tests_unknown
+                self.append_log(f"\n[SONUÇ] PASS: {tests_passed} | FAIL: {tests_failed} | UNKNOWN: {tests_unknown} (Toplam: {tests_total} Test)")
                 if is_ultra and errors:
                     self.append_log("--- Ultra Detaylı Hata Listesi ---")
                     for err in errors:

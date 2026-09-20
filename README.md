@@ -111,3 +111,6 @@ Bu proje **MIT Lisansı** altında yayınlanmıştır.
 Geliştirici: Mehmet Akif Şahin (winexee)
 
 Bug raporları ve iletişim için: [GitHub Issues](https://github.com/winexee/safebox/issues)
+
+### Sistem Sınırları (Seccomp)
+SafeBox güçlü bir namespace izolasyonu sunar (Mount, PID, UTS, IPC, vb.), ancak şu an için **Seccomp (Secure Computing Mode) BPF filtrelemesi uygulamamaktadır**. Sandbox içerisindeki süreçler ana bilgisayar (host) kernel'ine doğrudan sistem çağrısı yapabilir. VM seviyesinde bir izolasyon hedeflenmemektedir.
