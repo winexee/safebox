@@ -243,6 +243,7 @@ class SafeBoxGUI(Gtk.Window):
             self.append_log("[🔍 SİSTEM TESTİ BAŞLANIYOR]")
             tests_passed = 0
             tests_total = 0
+            tests_unknown = 0
             errors = []
             
             # Test 1: RootFS kontrolü
@@ -480,7 +481,14 @@ class SafeBoxGUI(Gtk.Window):
                             self.append_log(f"  ⚠ UTS: Hostname kontrol edilemedi ({e})")
                             tests_unknown += 1
                 else:
-                    self.append_log("ℹ Arka Plan Süreci: Çalışan bir oturum yok")
+                    self.append_log("✗ Sandbox Runtime: FAIL (Çalışan bir oturum yok)")
+                    errors.append("Sandbox başlatılamadı.")
+                    if is_ultra:
+                        self.append_log("  ⚠ Cgroup: UNKNOWN")
+                        self.append_log("  ⚠ Namespace: UNKNOWN")
+                        self.append_log("  ⚠ Filesystem: UNKNOWN")
+                        self.append_log("  ⚠ Hostname: UNKNOWN")
+                        tests_unknown += 12 # 2 limit + 1 affinity + 6 ns + 1 mount + 1 dev + 1 uts
             except Exception as e:
                 msg = f"✗ Arka Plan Kontrolü hatası: {e}"
                 if is_ultra: self.append_log(msg)

@@ -114,3 +114,9 @@ Bug raporları ve iletişim için: [GitHub Issues](https://github.com/winexee/sa
 
 ### Sistem Sınırları (Seccomp)
 SafeBox güçlü bir namespace izolasyonu sunar (Mount, PID, UTS, IPC, vb.), ancak şu an için **Seccomp (Secure Computing Mode) BPF filtrelemesi uygulamamaktadır**. Sandbox içerisindeki süreçler ana bilgisayar (host) kernel'ine doğrudan sistem çağrısı yapabilir. VM seviyesinde bir izolasyon hedeflenmemektedir.
+
+### Snap Confinement Notu
+SafeBox Snap paketi olarak dağıtıldığında `confinement: classic` (klasik izolasyon) kullanır. Snap'in kendi strict izolasyon (apparmor) katmanı SafeBox'ın bwrap yeteneklerini engellememesi için kasıtlı olarak classic yapılmıştır. Gerçek güvenlik ve izolasyon sınırı Snap tarafından değil, SafeBox'ın çalıştırdığı Bubblewrap ve namespace mimarisi tarafından sağlanmaktadır.
+
+### Ses İzolasyonu (Audio Socket)
+Kullanıcı GUI üzerinden sesi açtığında (Audio=1), Host'a ait PulseAudio veya PipeWire soketi doğrudan Guest ortamına bind edilir. Bu özellik ses aktarımı için zorunlu ve bilinçli bir davranış olsa da, teknik olarak host'un ses altyapısı ile bir paylaşım tüneli oluşturur. Tam bir sanal makine (VM) izolasyonu sunmaz, host'taki ses servisine kontrollü erişim sağlar.
