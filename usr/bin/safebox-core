@@ -230,7 +230,6 @@ BWRAP_ARGS=(
     --setenv PATH "/home/safebox/.local/bin:/usr/local/bin:/usr/bin:/bin"
     --tmpfs /usr/share/applications
     --ro-bind /usr/share/safebox/guest-apps /usr/share/applications
-    --ro-bind /usr/share/safebox/guest-apps /mnt
     --ro-bind /usr/share/safebox/safebox-guest-blocker /home/safebox/.local/bin/safebox
     --die-with-parent
     --new-session
