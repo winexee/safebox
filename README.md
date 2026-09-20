@@ -29,7 +29,7 @@ SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinm
 ### 📦 Standart İçerik (RootFS)
 * **Epiphany:** Web tarayıcısı
 * **Nemo:** Dosya yöneticisi
-* **XTerm:** Komut satırı
+* **GNOME Terminal:** Komut satırı
 * **Gedit:** Metin düzenleyici
 * **GNOME System Monitor:** Kaynak takibi
 
@@ -83,7 +83,7 @@ safebox
 | **İnternet ve Ağ** | Açık: Host ağını kullanır. Kapalı: Ağ namespace'ini izole eder (İnternet kesilir). |
 | **Paylaşım** | `~/SafeBox-Paylasim` klasörü sandbox içerisine bağlanır. Çift yönlü dosya aktarımı için kullanılır. |
 
-### Sistem Testi (Doctor)
+### Sistem Testi (Test)
 
 Konsol sekmesinden "test" komutunu çalıştırdığınızda şu gerçek zamanlı kontroller yapılır:
 1. RootFS'in düzgün kurulup kurulmadığı.

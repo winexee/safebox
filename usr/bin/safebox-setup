@@ -120,8 +120,8 @@ deb http://security.ubuntu.com/ubuntu ${DISTRO}-security main restricted univers
 EOF
 
 # Masaüstü paketlerini kur
-# Not: cinnamon-core ağır bağımlılıklar zinciri nedeniyle chroot'ta konfigure edilemiyor.
-# Bunun yerine sadece çalışabilir minimum bileşenleri kuruyoruz.
+# Not: policy-rc.d sayesinde servis başlatma hataları engellendiği için,
+# tam bir cinnamon-core kurulumu güvenle yapılabilir.
 chroot "$ROOTFS_TMP" /bin/bash -c "
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq

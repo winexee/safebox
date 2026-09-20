@@ -235,14 +235,14 @@ BWRAP_ARGS=(
     --new-session
 )
 
-# Kontrollü /dev/dri Düğümleri
-if [ -e /dev/dri/renderD128 ]; then BWRAP_ARGS+=(--dev-bind /dev/dri/renderD128 /dev/dri/renderD128); fi
-if [ -e /dev/dri/card0 ]; then BWRAP_ARGS+=(--dev-bind /dev/dri/card0 /dev/dri/card0); fi
-
-# Kontrollü NVIDIA Düğümleri
-for nv_node in /dev/nvidia0 /dev/nvidiactl /dev/nvidia-modeset /dev/nvidia-uvm; do
-    if [ -e "$nv_node" ]; then BWRAP_ARGS+=(--dev-bind "$nv_node" "$nv_node"); fi
-done
+# NOT: guest-init içerisinde "CINNAMON_SOFTWARE_RENDERING=1" zorunlu kılındığı için,
+# Sandbox stabilitesini korumak adına GPU donanımları /dev içerisine aktarılmaz.
+# İzolasyonu artırır ve yazılım tabanlı render ile çelişkiyi engeller.
+# if [ -e /dev/dri/renderD128 ]; then BWRAP_ARGS+=(--dev-bind /dev/dri/renderD128 /dev/dri/renderD128); fi
+# if [ -e /dev/dri/card0 ]; then BWRAP_ARGS+=(--dev-bind /dev/dri/card0 /dev/dri/card0); fi
+# for nv_node in /dev/nvidia0 /dev/nvidiactl /dev/nvidia-modeset /dev/nvidia-uvm; do
+#     if [ -e "$nv_node" ]; then BWRAP_ARGS+=(--dev-bind "$nv_node" "$nv_node"); fi
+# done
 
 # Ağ - İzole Namespace (Network Isolation)
 if [ "$NET" = "1" ]; then
