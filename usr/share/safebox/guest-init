@@ -6,6 +6,7 @@ export LOGNAME=safebox
 export XDG_DATA_DIRS=/usr/local/share:/usr/share
 export XDG_CURRENT_DESKTOP=X-Cinnamon
 export DESKTOP_SESSION=cinnamon
+export XDG_SESSION_TYPE=x11
 export LIBGL_ALWAYS_SOFTWARE=1
 export GIO_USE_VFS=local
 export GVFS_DISABLE_FUSE=1

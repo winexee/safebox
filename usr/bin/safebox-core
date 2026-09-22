@@ -96,6 +96,11 @@ flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36
 CPU_EOF
     echo "cpu$i 1000 0 1000 10000 0 0 0 0 0 0" >> "${PROC_MOCK_DIR}/stat"
 done
+echo "btime $(date +%s)" >> "${PROC_MOCK_DIR}/stat"
+echo "processes 1000" >> "${PROC_MOCK_DIR}/stat"
+echo "procs_running 1" >> "${PROC_MOCK_DIR}/stat"
+echo "procs_blocked 0" >> "${PROC_MOCK_DIR}/stat"
+
 
 MAX_CORE=$((CPU_CORES - 1))
 if [ "$MAX_CORE" -lt 0 ]; then MAX_CORE=0; fi

@@ -1,0 +1,107 @@
+dbus-daemon[55]: [session uid=1000 pid=55] Activating service name='org.freedesktop.systemd1' requested by ':1.0' (uid=1000 pid=56 comm="cinnamon-session" label="bwrap (unconfined)")
+dbus-daemon[55]: [session uid=1000 pid=55] Activated service 'org.freedesktop.systemd1' failed: Process org.freedesktop.systemd1 exited with status 1
+dbus-daemon[55]: [session uid=1000 pid=55] Activating service name='org.freedesktop.systemd1' requested by ':1.0' (uid=1000 pid=56 comm="cinnamon-session" label="bwrap (unconfined)")
+dbus-daemon[55]: [session uid=1000 pid=55] Activated service 'org.freedesktop.systemd1' failed: Process org.freedesktop.systemd1 exited with status 1
+cinnamon-session[56]: GLib-GObject-CRITICAL: t+0.00091s: g_object_class_override_property: Can't find property to override for 'CsmConsolekit::active'
+cinnamon-session[56]: WARNING: t+0.00152s: Calling GetSessionForUnixProcess failed.Check that ConsoleKit is properly installed.
+cinnamon-session[56]: WARNING: t+0.00153s: Could not get session id for session. Check that ConsoleKit is properly installed.
+_IceTransmkdir: ERROR: euid != 0,directory /tmp/.ICE-unix will not be created.
+dbus-daemon[55]: [session uid=1000 pid=55] Activating service name='org.freedesktop.systemd1' requested by ':1.0' (uid=1000 pid=56 comm="cinnamon-session" label="bwrap (unconfined)")
+dbus-daemon[55]: [session uid=1000 pid=55] Activated service 'org.freedesktop.systemd1' failed: Process org.freedesktop.systemd1 exited with status 1
+dbus-daemon[55]: [session uid=1000 pid=55] Activating service name='org.freedesktop.systemd1' requested by ':1.0' (uid=1000 pid=56 comm="cinnamon-session" label="bwrap (unconfined)")
+dbus-daemon[55]: [session uid=1000 pid=55] Activated service 'org.freedesktop.systemd1' failed: Process org.freedesktop.systemd1 exited with status 1
+cinnamon-session[56]: WARNING: t+0.01278s: Could not read /etc/xdg/autostart/xdg-user-dirs-kde.desktop: Could not parse desktop file xdg-user-dirs-kde.desktop or it references a not found TryExec binary
+[cinnamon-settings-daemon-smartcard] Failed to start: no suitable smartcard driver could be found
+
+** (csd-settings-remap:106): WARNING **: 19:05:42.068: Skipping schema 'org.gnome.settings-daemon.plugins.xsettings' - doesn't exist
+dbus-daemon[55]: [session uid=1000 pid=55] Activating service name='ca.desrt.dconf' requested by ':1.4' (uid=1000 pid=106 comm="/usr/bin/csd-settings-remap" label="bwrap (unconfined)")
+dbus-daemon[55]: [session uid=1000 pid=55] Successfully activated service 'ca.desrt.dconf'
+Xlib:  extension "DPMS" missing on display ":99".
+Xlib:  extension "DPMS" missing on display ":99".
+dbus-daemon[117]: Activating service name='org.a11y.atspi.Registry' requested by ':1.1' (uid=1000 pid=99 comm="/usr/bin/csd-color" label="bwrap (unconfined)")
+
+** (csd-color:99): WARNING **: 19:05:42.106: There is no colord server available
+
+** (csd-color:99): WARNING **: 19:05:42.106: Failed to get session for pid: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.ConsoleKit was not provided by any .service files
+dbus-daemon[117]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[55]: [session uid=1000 pid=55] Activating service name='org.gtk.vfs.Daemon' requested by ':1.12' (uid=1000 pid=118 comm="/usr/bin/csd-automount" label="bwrap (unconfined)")
+
+** (csd-media-keys:95): WARNING **: 19:05:42.109: Unable to inhibit keypresses: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.login1 was not provided by any .service files
+dbus-daemon[55]: [session uid=1000 pid=55] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[55]: [session uid=1000 pid=55] Activating service name='org.gtk.vfs.UDisks2VolumeMonitor' requested by ':1.12' (uid=1000 pid=118 comm="/usr/bin/csd-automount" label="bwrap (unconfined)")
+dbus-daemon[55]: [session uid=1000 pid=55] Successfully activated service 'org.gtk.vfs.UDisks2VolumeMonitor'
+
+** (csd-automount:118): WARNING **: 19:05:42.125: Failed to get session for pid: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.ConsoleKit was not provided by any .service files
+
+** (csd-power:89): WARNING **: 19:05:42.149: Failed set DPMS mode: Display is not DPMS capable
+
+(csd-power:89): libupower-glib-WARNING **: 19:05:42.150: up_client_get_devices failed: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+
+** (csd-power:89): WARNING **: 19:05:42.155: Unable to inhibit suspend: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.login1 was not provided by any .service files
+
+** (csd-power:89): WARNING **: 19:05:42.155: Unable to inhibit lid switch: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.login1 was not provided by any .service files
+
+** (csd-power:89): WARNING **: 19:05:42.158: Failed to get brightness: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+
+** (csd-power:89): WARNING **: 19:05:42.158: Failed to get session for pid: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.ConsoleKit was not provided by any .service files
+Exception in thread Thread-1 (monitor_memory):
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/bin/cinnamon-launcher", line 97, in monitor_memory
+    process = psutil.Process(self.cinnamon_pid)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/psutil/__init__.py", line 323, in __init__
+    self._init(pid)
+  File "/usr/lib/python3/dist-packages/psutil/__init__.py", line 359, in _init
+    self.create_time()
+  File "/usr/lib/python3/dist-packages/psutil/__init__.py", line 752, in create_time
+    self._create_time = self._proc.create_time()
+                        ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/psutil/_pslinux.py", line 1714, in wrapper
+    return fun(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/psutil/_pslinux.py", line 1951, in create_time
+    bt = BOOT_TIME or boot_time()
+                      ^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/psutil/_pslinux.py", line 1639, in boot_time
+    raise RuntimeError("line 'btime' not found in %s" % path)
+RuntimeError: line 'btime' not found in /proc/stat
+Window manager warning: Unsupported session type
+Cinnamon memory limit enabled: 2048 MB
+dbus-daemon[55]: [session uid=1000 pid=55] Activating service name='org.cinnamon.ScreenSaver' requested by ':1.0' (uid=1000 pid=56 comm="cinnamon-session" label="bwrap (unconfined)")
+
+** (at-spi2-registryd:158): WARNING **: 19:05:42.244: Failed to register client: GDBus.Error:org.gnome.SessionManager.AlreadyRegistered: Unable to register client
+
+** (at-spi2-registryd:158): WARNING **: 19:05:42.244: Unable to register client with session manager
+
+** (nemo-desktop:221): WARNING **: 19:05:42.269: Current gtk theme is not known to have nemo support (Adwaita) - checking...
+
+(polkit-gnome-authentication-agent-1:226): polkit-gnome-1-WARNING **: 19:05:42.273: Unable to determine the session we are in: No session for pid 226
+
+** (nemo-desktop:221): WARNING **: 19:05:42.298: The theme appears to have no nemo support.  Adding some...
+** Message: 19:05:42.301: nemo-desktop: session is cinnamon, establishing proxy
+Loading AccountsService
+Muffin not running, skipping fractional scaling check.
+Trying to connect to logind...
+dbus-daemon[55]: [session uid=1000 pid=55] Successfully activated service 'org.cinnamon.ScreenSaver'
+Starting screensaver...
+Cinnamon Screensaver support not found in current theme - adding some...
+Failed to establish a connection with UPower - the battery indicator will be disabled.
+Failed to connect to Cinnamon - screensaver will not activate when expo or overview modes are active.
+cinnamon-session[56]: WARNING: t+0.33543s: Detected that screensaver has appeared on the bus
+Failed to connect to logind, or it doesn't exist.
+Trying to connect to ConsoleKit...
+Could not get AccountsService User object path: g-io-error-quark: Cannot invoke method; proxy is for the well-known name org.freedesktop.Accounts without an owner, and proxy was constructed with the G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START flag (0)
+Failed to connect to ConsoleKit, or it doesn't exist.
+
+Unable to connect to either logind or ConsoleKit.  Certain things will not work,
+such as automatic unlocking when switching users from the desktop manager,
+or locking in appropriate power/system-management events.
+
+** (nemo-desktop:221): WARNING **: 19:05:47.597: nemo-desktop: Desktop failsafe timeout reached, applying fallback behavior
+cinnamon-session[56]: WARNING: t+14.96091s: Application 'at-spi-dbus-bus.desktop' killed by signal 1
+cinnamon-session[56]: WARNING: t+14.96282s: Application 'cinnamon-settings-daemon-clipboard.desktop' killed by signal 1
