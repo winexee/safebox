@@ -41,7 +41,7 @@ SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinm
 
 ```bash
 sudo apt update
-sudo apt install bubblewrap xserver-xephyr dbus-x11 python3 python3-gi gir1.2-gtk-3.0 debootstrap policykit-1
+sudo apt install bubblewrap xserver-xephyr dbus-x11 python3 python3-gi gir1.2-gtk-3.0 debootstrap policykit-1 x11-utils
 ```
 
 ### 2. Projenin Kurulması
