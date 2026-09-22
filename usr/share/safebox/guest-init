@@ -4,6 +4,9 @@ export USER=safebox
 export LOGNAME=safebox
 
 export XDG_DATA_DIRS=/usr/local/share:/usr/share
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+
 export XDG_CURRENT_DESKTOP=X-Cinnamon
 export DESKTOP_SESSION=cinnamon
 export XDG_SESSION_TYPE=x11

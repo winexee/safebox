@@ -240,6 +240,8 @@ BWRAP_ARGS=(
     --dir /run/user/1000
     --setenv XDG_RUNTIME_DIR /run/user/1000
     --tmpfs /home
+    --ro-bind-try /usr/share/icons /usr/share/icons
+    --ro-bind-try /usr/share/themes /usr/share/themes
     --dir /home/safebox
     --dir /home/safebox/.local/bin
     --setenv HOME /home/safebox
