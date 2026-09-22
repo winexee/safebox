@@ -122,7 +122,7 @@ if [ -z "$TARGET_DISP" ]; then
 fi
 
 echo "[BİLGİ] Xephyr başlatılıyor: $TARGET_DISP" >> "$ENGINE_LOG"
-Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -title "SafeBox Secure Workspace ($TARGET_DISP)" -resizeable -extension MIT-SHM >> "$ENGINE_LOG" 2>&1 &
+Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -title "SafeBox Secure Workspace ($TARGET_DISP)" -extension MIT-SHM >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
 # Dönüş değerini kontrol et
