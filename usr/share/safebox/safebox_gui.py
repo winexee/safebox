@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SafeBox Control Center - v1.7.24
+SafeBox Control Center - v1.7.26
 Original Classic UI & Cinnamon Integration
 """
 

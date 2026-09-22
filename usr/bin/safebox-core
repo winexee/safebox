@@ -149,6 +149,7 @@ cleanup() {
         sleep 1
     done
     echo "[BİLGİ] Xephyr kapandı. Sandbox durduruluyor..." >> "$ENGINE_LOG"
+    systemctl --user stop safebox-app.scope 2>/dev/null || true
     kill -TERM $$ 2>/dev/null || true
 ) &
 
