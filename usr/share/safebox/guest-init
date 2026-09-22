@@ -59,4 +59,4 @@ dbus-daemon --session --address=unix:path=/run/dbus/system_bus_socket --nopidfil
 
 # Temel masaüstü bileşenlerini başlat (Cinnamon'un DBus oturumu ile başlaması gerekir)
 
-exec dbus-run-session -- cinnamon-session
+exec dbus-run-session -- cinnamon-session --session cinnamon2d
