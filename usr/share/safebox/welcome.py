@@ -29,7 +29,7 @@ class WelcomeWindow(Gtk.Window):
             "Bu izole konteynerde (namespace) yaptığınız işlemler ana sisteminizi korur.\n\n"
             "• <b>Sistem Güvenliği:</b> Ana dosya sisteminiz salt-okunur korunur.\n"
             "• <b>Geçici Hafıza:</b> İndirdiğiniz veriler kapandığında silinir (RAM).\n"
-            "• <b>Donanım Erişimi:</b> GPU ve ses performans için paylaşılmıştır.\n"
+            "• <b>Donanım İzolasyonu:</b> Yazılım tabanlı görüntüleme kullanılır; ses ve paylaşım isteğe bağlıdır.\n"
             "• <b>Uyarı:</b> Bir sanal makine (VM) değildir, dikkatli kullanın."
         )
         desc.set_line_wrap(True)

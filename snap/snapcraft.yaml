@@ -1,5 +1,5 @@
 name: safebox
-version: '1.7.24'
+version: '1.7.30'
 summary: Namespace-based, RAM-backed lightweight sandbox environment
 description: |
   SafeBox creates a volatile, namespace-based desktop sandbox environment with Bubblewrap.
@@ -38,5 +38,13 @@ parts:
       - bubblewrap
       - librsvg2-common
       - xserver-xephyr
+      - x11-utils
       - dbus-x11
+      - debootstrap
       - pulseaudio-utils
+    prime:
+      - -debian
+      - -scratch
+      - -BUGFIX_ANALYSIS.md
+      - -README.md
+      - -LICENSE

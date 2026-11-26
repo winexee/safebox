@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
-# SafeBox RootFS Kurulum Betiği (v1.7.24)
+# SafeBox RootFS Kurulum Betiği (v1.7.30)
 # Bu betik sandbox için gerekli rootfs'i oluşturur.
 # Root (sudo) yetkisi gerektirir.
 set -euo pipefail
 
 ROOTFS_DIR="/var/lib/safebox/rootfs"
+ROOTFS_TMP="${ROOTFS_DIR}.tmp"
 DISTRO="noble"  # Ubuntu 24.04 LTS
+AUTO_YES=0
+
+for arg in "$@"; do
+    case "$arg" in
+        -y|--yes|--force)
+            AUTO_YES=1
+            ;;
+        -h|--help)
+            echo "Kullanım: sudo safebox-setup [-y|--yes]"
+            exit 0
+            ;;
+    esac
+done
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -25,10 +39,70 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+unmount_rootfs_tmp() {
+    local sub target
+    for sub in proc dev sys; do
+        target="${ROOTFS_TMP}/${sub}"
+        if [ -d "$target" ]; then
+            if command -v mountpoint >/dev/null 2>&1; then
+                if mountpoint -q "$target"; then
+                    umount "$target" 2>/dev/null || umount -l "$target" 2>/dev/null || return 1
+                fi
+            else
+                umount "$target" 2>/dev/null || true
+            fi
+        fi
+    done
+    return 0
+}
+
+safe_remove_tmp() {
+    if [ ! -e "$ROOTFS_TMP" ]; then
+        return 0
+    fi
+    if ! unmount_rootfs_tmp; then
+        print_error "$ROOTFS_TMP altındaki sanal dosya sistemleri (proc/dev/sys) ayrılamadı; güvenli silme iptal edildi."
+        return 1
+    fi
+    rm -rf "$ROOTFS_TMP"
+}
+
+SETUP_COMPLETE=0
+CLEANUP_RAN=0
+
+cleanup_on_exit() {
+    local rc=$?
+    if [ "$CLEANUP_RAN" -eq 1 ]; then
+        return 0
+    fi
+    CLEANUP_RAN=1
+    trap - EXIT INT TERM
+
+    unmount_rootfs_tmp || true
+
+    if [ "$SETUP_COMPLETE" -eq 0 ]; then
+        safe_remove_tmp || true
+        if [ -d "${ROOTFS_DIR}.old" ] && [ ! -d "$ROOTFS_DIR" ]; then
+            print_warn "Kurulum başarısız oldu, eski rootfs geri yükleniyor..."
+            mv "${ROOTFS_DIR}.old" "$ROOTFS_DIR" || true
+        fi
+        if [ "$rc" -eq 0 ]; then
+            exit 1
+        fi
+    fi
+}
+
 # Zaten kurulu mu kontrol et
 if [ -f "$ROOTFS_DIR/.safebox-rootfs-complete" ]; then
     print_warn "RootFS zaten mevcut ve tam: $ROOTFS_DIR"
-    read -rp "Yeniden oluşturmak istiyor musunuz? [e/H]: " choice
+    if [ "$AUTO_YES" -eq 1 ]; then
+        choice="e"
+    elif [ -t 0 ]; then
+        read -rp "Yeniden oluşturmak istiyor musunuz? [e/H]: " choice || choice=""
+    else
+        print_error "Etkileşimli olmayan ortamda yeniden kurulum için --yes parametresi gereklidir."
+        exit 1
+    fi
     if [[ ! "$choice" =~ ^[eEyY]$ ]]; then
         print_info "Kurulum iptal edildi."
         exit 0
@@ -41,12 +115,10 @@ elif [ -d "$ROOTFS_DIR" ]; then
     rm -rf "$ROOTFS_DIR"
 fi
 
-# Yarım kalmış bir geçici klasör varsa sil
-ROOTFS_TMP="${ROOTFS_DIR}.tmp"
-rm -rf "$ROOTFS_TMP"
+# Yarım kalmış bir geçici klasör varsa önce mountları ayırıp güvenle sil
+safe_remove_tmp
 
-# Hata yakalama: Hata olursa yedeği geri yükle
-trap 'if [ -d "${ROOTFS_DIR}.old" ] && [ ! -d "$ROOTFS_DIR" ]; then print_warn "Kurulum başarısız, eski rootfs geri yükleniyor..."; mv "${ROOTFS_DIR}.old" "$ROOTFS_DIR"; fi; exit 1' ERR INT TERM
+trap cleanup_on_exit EXIT INT TERM
 
 # Bağımlılıkları kontrol et
 print_info "Bağımlılıklar kontrol ediliyor..."
@@ -99,18 +171,16 @@ exit 101
 EOF
 chmod +x "$ROOTFS_TMP/usr/sbin/policy-rc.d"
 
-# /proc ve /dev geçici olarak bağla
-mount --bind /proc "$ROOTFS_TMP/proc" 2>/dev/null || true
-mount --bind /dev  "$ROOTFS_TMP/dev"  2>/dev/null || true
-mount --bind /sys  "$ROOTFS_TMP/sys"  2>/dev/null || true
+# Chroot içinde DNS çözümlemesi için resolv.conf'u gerçek dosya olarak kopyala
+if [ -r /etc/resolv.conf ]; then
+    rm -f "$ROOTFS_TMP/etc/resolv.conf"
+    cp -L /etc/resolv.conf "$ROOTFS_TMP/etc/resolv.conf"
+fi
 
-# Cleanup fonksiyonu
-cleanup_mounts() {
-    umount "$ROOTFS_TMP/proc" 2>/dev/null || true
-    umount "$ROOTFS_TMP/dev"  2>/dev/null || true
-    umount "$ROOTFS_TMP/sys"  2>/dev/null || true
-}
-trap cleanup_mounts EXIT
+# /proc, /dev ve /sys geçici olarak bağla
+mount --bind /proc "$ROOTFS_TMP/proc"
+mount --bind /dev  "$ROOTFS_TMP/dev"
+mount --bind /sys  "$ROOTFS_TMP/sys"
 
 # Depo listesini ekle (universe dahil)
 cat > "$ROOTFS_TMP/etc/apt/sources.list" << EOF
@@ -156,7 +226,7 @@ chroot "$ROOTFS_TMP" /bin/bash -c "
 # RootFS bileşenlerini doğrulama
 print_info "Cinnamon bileşenleri doğrulanıyor..."
 MISSING_BIN=""
-for bin in cinnamon cinnamon-session nemo gnome-terminal gnome-system-monitor gedit epiphany-browser dbus-daemon; do
+for bin in cinnamon cinnamon-session nemo gnome-terminal gnome-system-monitor gedit epiphany dbus-daemon; do
     if [ ! -f "$ROOTFS_TMP/usr/bin/$bin" ] && [ ! -f "$ROOTFS_TMP/bin/$bin" ]; then
         MISSING_BIN="$MISSING_BIN $bin"
     fi
@@ -169,16 +239,15 @@ if [ -n "$MISSING_BIN" ]; then
 fi
 
 # Gerçek çalışma testleri (version sorgusu)
-chroot "$ROOTFS_TMP" cinnamon-session --version > /dev/null 2>&1 || print_error "cinnamon-session çalıştırılamıyor (Display eksikliği olabilir)"
-chroot "$ROOTFS_TMP" cinnamon --version > /dev/null 2>&1 || print_error "cinnamon çalıştırılamıyor (Display eksikliği olabilir)"
-chroot "$ROOTFS_TMP" nemo --version > /dev/null 2>&1 || print_error "nemo çalıştırılamıyor (Display eksikliği olabilir)"
+chroot "$ROOTFS_TMP" cinnamon-session --version > /dev/null 2>&1 || print_warn "cinnamon-session sürüm sorgusu başarısız (Display eksikliği olabilir)"
+chroot "$ROOTFS_TMP" cinnamon --version > /dev/null 2>&1 || print_warn "cinnamon sürüm sorgusu başarısız (Display eksikliği olabilir)"
+chroot "$ROOTFS_TMP" nemo --version > /dev/null 2>&1 || print_warn "nemo sürüm sorgusu başarısız (Display eksikliği olabilir)"
 
 print_ok "Tüm Cinnamon bileşenleri başarıyla kuruldu ve çalıştırılabilir durumda."
 
 # Servis engelini kaldır
 rm -f "$ROOTFS_TMP/usr/sbin/policy-rc.d"
-cleanup_mounts
-trap - ERR INT TERM EXIT
+unmount_rootfs_tmp
 
 print_ok "Masaüstü ortamı kuruldu."
 
@@ -205,12 +274,10 @@ print_ok "Temizlik tamamlandı."
 # Kurulumun tamamlandığını belirten bayrak dosyasını ekle
 touch "$ROOTFS_TMP/.safebox-rootfs-complete"
 
-# Hata tuzağını kaldır
-trap - ERR INT TERM
-
 # Atomik olarak taşı
 rm -rf "$ROOTFS_DIR"
 mv "$ROOTFS_TMP" "$ROOTFS_DIR"
+SETUP_COMPLETE=1
 rm -rf "${ROOTFS_DIR}.old"
 
 # Boyut bilgisi

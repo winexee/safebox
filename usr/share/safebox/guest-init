@@ -11,16 +11,26 @@ export XDG_CURRENT_DESKTOP=X-Cinnamon
 export DESKTOP_SESSION=cinnamon
 export XDG_SESSION_TYPE=x11
 export LIBGL_ALWAYS_SOFTWARE=1
+export CINNAMON_SOFTWARE_RENDERING=1
 export GIO_USE_VFS=local
 export GVFS_DISABLE_FUSE=1
 
-mkdir -p /home/safebox/Desktop /home/safebox/Downloads /home/safebox/Documents /home/safebox/Paylasim
+mkdir -p /var/tmp && chmod 1777 /var/tmp 2>/dev/null || true
+mkdir -p /home/safebox/Desktop /home/safebox/Downloads /home/safebox/Documents
+if [ "${SAFEBOX_SHARE:-1}" = "1" ]; then
+    mkdir -p /home/safebox/Paylasim
+fi
 
 # Masaüstü Simgeleri
-for app in browser home share terminal editor; do
+GUEST_APPS=(browser home terminal editor monitor)
+if [ "${SAFEBOX_SHARE:-1}" = "1" ]; then
+    GUEST_APPS+=(share)
+fi
+
+for app in "${GUEST_APPS[@]}"; do
     app_file="/tmp/guest-apps/${app}.desktop"
     if [ -f "$app_file" ]; then
-        cp "$app_file" /home/safebox/Desktop/ 2>/dev/null && chmod +x /home/safebox/Desktop/${app}.desktop 2>/dev/null || true
+        cp "$app_file" /home/safebox/Desktop/ 2>/dev/null && chmod +x "/home/safebox/Desktop/${app}.desktop" 2>/dev/null || true
     fi
 done
 
@@ -40,23 +50,22 @@ gtk-icon-theme-name="Adwaita"
 gtk-font-name="Sans 10"
 EOF
 
-export CINNAMON_SOFTWARE_RENDERING=1
-export LIBGL_ALWAYS_SOFTWARE=1
+# Host izolasyonunu sağlamak için sahte (mock) bir System DBus başlat (Cinnamon çökmesini engeller)
+# --fork soket dinlemeye hazır olana kadar bekler (race condition önlenir)
+mkdir -p /run/dbus
+dbus-daemon --session --address=unix:path=/run/dbus/system_bus_socket --fork --nopidfile --syslog-only
 
-
-# Masaüstü ve Tema ayarları (GSettings)
+# GSettings/dconf yazımlarını aktif DBus oturumu içinde uygula ve Cinnamon 2D başlat
+cat > /tmp/.guest-session.sh << 'EOF'
+#!/usr/bin/env bash
 dconf write /org/cinnamon/desktop/background/picture-uri "'none'" || true
 dconf write /org/cinnamon/desktop/background/primary-color "'#2b2b2b'" || true
 dconf write /org/cinnamon/desktop/background/color-shading-type "'solid'" || true
 dconf write /org/cinnamon/desktop/interface/cursor-theme "'DMZ-White'" || true
 dconf write /org/cinnamon/desktop/interface/gtk-theme "'Adwaita'" || true
 dconf write /org/cinnamon/desktop/interface/icon-theme "'Adwaita'" || true
+exec cinnamon-session --session cinnamon2d
+EOF
+chmod +x /tmp/.guest-session.sh
 
-
-# Host izolasyonunu sağlamak için sahte (mock) bir System DBus başlat (Cinnamon çökmesini engeller)
-mkdir -p /run/dbus
-dbus-daemon --session --address=unix:path=/run/dbus/system_bus_socket --nopidfile --syslog-only &
-
-# Temel masaüstü bileşenlerini başlat (Cinnamon'un DBus oturumu ile başlaması gerekir)
-
-exec dbus-run-session -- cinnamon-session --session cinnamon2d
+exec dbus-run-session -- /tmp/.guest-session.sh

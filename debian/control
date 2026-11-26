@@ -16,7 +16,10 @@ Depends: ${misc:Depends},
          python3-gi,
          gir1.2-gtk-3.0,
          debootstrap,
-         policykit-1
+         pkexec | policykit-1,
+         x11-utils,
+         util-linux,
+         systemd
 Description: Namespace tabanlı izole konteyner masaüstü ortamı
- SafeBox; Bubblewrap, Cinnamon ve Xephyr altyapısını birleştirerek 
+ SafeBox; Bubblewrap, Cinnamon ve Xephyr altyapısını birleştirerek
  konteyner (namespace) izolasyonlu bir sanal masaüstü ortamı sunar.

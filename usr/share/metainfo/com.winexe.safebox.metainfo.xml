@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>safebox.desktop</id>
+  <id>com.winexe.safebox</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>SafeBox</name>
   <summary>Namespace Tabanlı İzole Konteyner Ortamı</summary>
+  <developer id="com.winexe">
+    <name>Mehmet Akif Şahin</name>
+  </developer>
+  <url type="homepage">https://github.com/winexee/safebox</url>
   <description>
     <p>
-      SafeBox, Bubblewrap ve Cinnamon altyapısını kullanarak sistem dosyalarını 
+      SafeBox, Bubblewrap ve Cinnamon altyapısını kullanarak sistem dosyalarını
       ve kişisel verileri ayrıştıran tek kullanımlık bir konteyner (namespace) sandbox ortamı sunar.
     </p>
   </description>
@@ -15,6 +19,7 @@
   <provides>
     <binary>safebox</binary>
   </provides>
+  <content_rating type="oars-1.1" />
   <categories>
     <category>Utility</category>
     <category>Security</category>

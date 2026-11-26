@@ -2,14 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04%20LTS-orange.svg)](https://ubuntu.com/)
-[![Release](https://img.shields.io/badge/Release-v1.7.20-brightgreen.svg)](https://github.com/winexee/safebox/releases)
+[![Release](https://img.shields.io/badge/Release-v1.7.30-brightgreen.svg)](https://github.com/winexee/safebox/releases)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Bash](https://img.shields.io/badge/Bash-5.0+-red.svg)](https://www.gnu.org/software/bash/)
 [![safebox](https://snapcraft.io/safebox/badge.svg)](https://snapcraft.io/safebox)
 
 SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinmek ve ana sistem dosya yapısını korumak için geliştirilmiş, **Bubblewrap** tabanlı bir **konteyner (namespace)** sanal alanıdır.
 
-> ⚠️ **UYARI - İzolasyon Sınırları:** SafeBox bir "Sanal Makine (VM)" DEĞİLDİR. Tam donanım izolasyonu sağlamaz. Çekirdeği (Kernel) ana sistemle paylaşır. Grafik performansı için `/dev/dri` ve NVIDIA cihazları sandbox içine aktarılır. Bu nedenle izolasyon düzeyi standart bir konteyner sınırları içindedir.
+> ⚠️ **UYARI - İzolasyon Sınırları:** SafeBox bir "Sanal Makine (VM)" DEĞİLDİR. Tam donanım izolasyonu sağlamaz. Çekirdeği (Kernel) ana sistemle paylaşır. Grafik işleme kararlılığı ve izolasyon için donanım GPU düğümleri (`/dev/dri`, NVIDIA) aktarılmaz; yazılım tabanlı render (`CINNAMON_SOFTWARE_RENDERING=1`) kullanılır. Yine de izolasyon düzeyi standart bir konteyner sınırları içindedir.
 
 ---
 
@@ -22,7 +22,7 @@ SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinm
 * **Sistem Dosyası Koruma:** Host sistem dosyaları sandbox'a bağlanmaz. Kendi izole `debootstrap` rootfs'i kullanılır.
 
 ### 🖥️ Kullanıcı Deneyimi
-* **Cinnamon Masaüstü:** Sade, anlaşılır ve bilindik masaüstü arayüzü.
+* **Cinnamon Masaüstü:** Sade, anlaşılır ve bilindik masaüstü arayüzü (Cinnamon 2D yazılım render modu).
 * **Pratik Otomatik Kurulum:** Tek tuşla `safebox-setup` tetiklenerek gerekli RootFS hazırlanır.
 * **GTK3 Kontrol Merkezi:** RAM limiti, işlemci limiti ve ağ erişimi gibi temel izinleri yönetin.
 
@@ -41,7 +41,7 @@ SafeBox, Linux üzerinde şüpheli dosyaları incelemek, güvenli ortamda gezinm
 
 ```bash
 sudo apt update
-sudo apt install bubblewrap xserver-xephyr dbus-x11 python3 python3-gi gir1.2-gtk-3.0 debootstrap policykit-1 x11-utils
+sudo apt install bubblewrap xserver-xephyr dbus-x11 python3 python3-gi gir1.2-gtk-3.0 debootstrap pkexec x11-utils
 ```
 
 ### 2. Projenin Kurulması
@@ -85,10 +85,10 @@ safebox
 
 ### Sistem Testi (Test)
 
-Konsol sekmesinden "test" komutunu çalıştırdığınızda şu gerçek zamanlı kontroller yapılır:
+Konsol sekmesinden önce `developer` komutunu girerek Geliştirici Modunu açıp ardından `test` veya `test ultra` komutunu çalıştırdığınızda şu gerçek zamanlı kontroller yapılır:
 1. RootFS'in düzgün kurulup kurulmadığı.
 2. Arka planda aktif bir SafeBox sürecinin olup olmadığı.
-3. Cgroup v2 bellek ve işlemci kısıtlamalarının başarıyla uygulanıp uygulanmadığı.
+3. Cgroup v2 bellek ve işlemci kısıtlamalarının başarıyla uygulanıp uygulanmadığı (`test ultra` ek olarak CPU affinity, namespace, mountinfo ve `/dev` izolasyonunu da doğrular).
 
 ---
 
@@ -98,7 +98,7 @@ SafeBox, kullanım kolaylığı ve performans sağlamak amacıyla bazı katı sa
 
 - **Çekirdek (Kernel) Paylaşımı:** Sistem ayrı bir çekirdek (VM) kullanmaz. `uname -r` host bilgisini gösterir. Ana sisteminizde çekirdek tabanlı (Kernel Exploit) bir zafiyet varsa SafeBox sizi koruyamaz.
 - **Seccomp Filtrelemesi Eksikliği:** Bubblewrap üzerinden özel bir BPF Syscall (Sistem Çağrısı) filtrelemesi yapılmaz.
-- **GPU Sızıntı Riski:** Tam donanım ivmelendirmesi sağlamak için `/dev/dri` ve NVIDIA düğümleri sandbox içerisine bağlanır. Zararlı bir kod GPU sürücüsü üzerinden host sisteme erişim (escape) deneyebilir.
+- **Grafik / X11 Sınırı:** GPU aygıt düğümleri (`/dev/dri`, NVIDIA) izole edilir ve aktarılmaz; bunun yerine Xephyr içinde yazılım tabanlı rendering kullanılır. Ancak X11 protokolünün doğası gereği pencere sunucusu üzerinden sınırlı etkileşim yüzeyi vardır.
 - **Ses Soketleri:** PulseAudio ve PipeWire doğrudan ana sistemden bağlanır. İzole edilmemiş ses soketleri teknik olarak host mikrofona dinleme yapma veya ses dinleme zafiyetlerine açıktır.
 - **Loglama:** SafeBox içindeki işlemler RAM'de tutulur, ancak hata logları ana sisteminizde `~/.local/share/safebox/safebox-engine.log` altında kalır.
 - **İç İçe Sandbox (Nested):** Güvenlik gereği SafeBox içerisinden tekrar SafeBox veya farklı bir sandbox çalıştırılması engellenmiştir.

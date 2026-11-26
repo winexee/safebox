@@ -1,8 +1,13 @@
-#!/bin/bash
-if [ -n "$SNAP" ]; then
-    export NO_AT_BRIDGE=1
+#!/usr/bin/env bash
+set -euo pipefail
+
+export NO_AT_BRIDGE=1
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+
+if [ -n "${SNAP:-}" ] && [ -f "$SNAP/usr/share/safebox/safebox_gui.py" ]; then
     exec python3 "$SNAP/usr/share/safebox/safebox_gui.py" "$@"
+elif [ -f "${SCRIPT_DIR}/../share/safebox/safebox_gui.py" ]; then
+    exec python3 "${SCRIPT_DIR}/../share/safebox/safebox_gui.py" "$@"
 else
-    export NO_AT_BRIDGE=1
     exec python3 "/usr/share/safebox/safebox_gui.py" "$@"
 fi
