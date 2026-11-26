@@ -10,6 +10,7 @@ Package: safebox
 Architecture: all
 Depends: ${misc:Depends},
          bubblewrap,
+         libseccomp2,
          xserver-xephyr,
          dbus-x11,
          python3,

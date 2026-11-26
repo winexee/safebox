@@ -107,6 +107,14 @@ if [ -f "$ROOTFS_DIR/.safebox-rootfs-complete" ]; then
         print_info "Kurulum iptal edildi."
         exit 0
     fi
+fi
+
+trap cleanup_on_exit EXIT INT TERM
+
+# Yarım kalmış bir geçici klasör varsa önce mountları ayırıp güvenle sil
+safe_remove_tmp
+
+if [ -f "$ROOTFS_DIR/.safebox-rootfs-complete" ]; then
     print_info "Mevcut rootfs yedekleniyor (.old)..."
     rm -rf "${ROOTFS_DIR}.old"
     mv "$ROOTFS_DIR" "${ROOTFS_DIR}.old"
@@ -114,11 +122,6 @@ elif [ -d "$ROOTFS_DIR" ]; then
     print_info "Tamamlanmamış rootfs bulundu, temizleniyor..."
     rm -rf "$ROOTFS_DIR"
 fi
-
-# Yarım kalmış bir geçici klasör varsa önce mountları ayırıp güvenle sil
-safe_remove_tmp
-
-trap cleanup_on_exit EXIT INT TERM
 
 # Bağımlılıkları kontrol et
 print_info "Bağımlılıklar kontrol ediliyor..."

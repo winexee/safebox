@@ -8,6 +8,7 @@ RESOLUTION="${3:-1366x768}"
 SHARE_FOLDER="${4:-1}"
 AUDIO="${5:-1}"
 NET="${6:-1}"
+SECCOMP="${7:-1}"
 
 ROOTFS="/var/lib/safebox/rootfs"
 
@@ -39,6 +40,7 @@ chmod 700 "$RUNTIME_DIR" 2>/dev/null || true
 LOCK_FILE="${RUNTIME_DIR}/safebox.lock"
 PID_FILE="${RUNTIME_DIR}/safebox-core.pid"
 BWRAP_JSON="${RUNTIME_DIR}/safebox-bwrap.json"
+SECCOMP_BPF="${RUNTIME_DIR}/safebox-seccomp.bpf"
 XEPHYR_CLOSED_FLAG="${RUNTIME_DIR}/xephyr-closed"
 
 # Giriş doğrulama
@@ -54,7 +56,7 @@ if ! [[ "$RESOLUTION" =~ ^[0-9]+x[0-9]+$ ]]; then
     echo "[HATA] Geçersiz ekran çözünürlüğü: $RESOLUTION" >> "$ENGINE_LOG"
     exit 108
 fi
-for flag_val in "$SHARE_FOLDER" "$AUDIO" "$NET"; do
+for flag_val in "$SHARE_FOLDER" "$AUDIO" "$NET" "$SECCOMP"; do
     if [ "$flag_val" != "0" ] && [ "$flag_val" != "1" ]; then
         echo "[HATA] Geçersiz boolean parametre değeri: $flag_val (0 veya 1 olmalı)" >> "$ENGINE_LOG"
         exit 108
@@ -76,7 +78,7 @@ fi
 # Önceki çökmüş oturumlardan kalma unit varsa temizle (kilit alındıktan sonra güvenli)
 systemctl --user stop safebox-app.scope 2>/dev/null || true
 systemctl --user reset-failed safebox-app.scope 2>/dev/null || true
-rm -f "$BWRAP_JSON" "$XEPHYR_CLOSED_FLAG"
+rm -f "$BWRAP_JSON" "$SECCOMP_BPF" "$XEPHYR_CLOSED_FLAG"
 
 # Test sistemi için PID kaydet
 echo $$ > "$PID_FILE"
@@ -111,7 +113,7 @@ cleanup() {
         rm -f "/tmp/.X${TARGET_DISP#:}-lock" 2>/dev/null || true
         rm -rf "/tmp/.X11-unix/X${TARGET_DISP#:}" 2>/dev/null || true
     fi
-    rm -f "$PID_FILE" "$BWRAP_JSON" "$XEPHYR_CLOSED_FLAG" 2>/dev/null || true
+    rm -f "$PID_FILE" "$BWRAP_JSON" "$SECCOMP_BPF" "$XEPHYR_CLOSED_FLAG" 2>/dev/null || true
 
     echo "=== [$(date '+%Y-%m-%d %H:%M:%S')] Oturum Kapatıldı ===" >> "$ENGINE_LOG"
 }
@@ -144,8 +146,11 @@ done
 # 1. HATA DÜZELTMESİ: Çekirdek Kernel UUID Yedeği
 if command -v dbus-uuidgen >/dev/null 2>&1; then
     dbus-uuidgen > "${ETC_MOCK_DIR}/machine-id"
+elif command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr -d '-' > "${ETC_MOCK_DIR}/machine-id"
 else
-    cat /proc/sys/kernel/random/uuid | tr -d '-' > "${ETC_MOCK_DIR}/machine-id"
+    # /proc/sys/kernel/random/uuid içinde tire olmadan oku (pipefail uyumlu)
+    tr -d '-' < /proc/sys/kernel/random/uuid > "${ETC_MOCK_DIR}/machine-id"
 fi
 
 cat << 'OS_EOF' > "${ETC_MOCK_DIR}/os-release"
@@ -201,10 +206,12 @@ flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36
 CPU_EOF
     echo "cpu$i 1000 0 1000 10000 0 0 0 0 0 0" >> "${PROC_MOCK_DIR}/stat"
 done
-echo "btime $(date +%s)" >> "${PROC_MOCK_DIR}/stat"
-echo "processes 1000" >> "${PROC_MOCK_DIR}/stat"
-echo "procs_running 1" >> "${PROC_MOCK_DIR}/stat"
-echo "procs_blocked 0" >> "${PROC_MOCK_DIR}/stat"
+{
+    echo "btime $(date +%s)"
+    echo "processes 1000"
+    echo "procs_running 1"
+    echo "procs_blocked 0"
+} >> "${PROC_MOCK_DIR}/stat"
 
 MAX_CORE=$((CPU_CORES - 1))
 if [ "$MAX_CORE" -lt 0 ]; then MAX_CORE=0; fi
@@ -225,7 +232,7 @@ if [ -z "$TARGET_DISP" ]; then
 fi
 
 echo "[BİLGİ] Xephyr başlatılıyor: $TARGET_DISP" >> "$ENGINE_LOG"
-Xephyr "$TARGET_DISP" -screen "$RESOLUTION" -title "SafeBox Secure Workspace ($TARGET_DISP)" -extension MIT-SHM >> "$ENGINE_LOG" 2>&1 &
+Xephyr "$TARGET_DISP" -nolisten tcp -screen "$RESOLUTION" -title "SafeBox Secure Workspace ($TARGET_DISP)" -extension MIT-SHM >> "$ENGINE_LOG" 2>&1 &
 XEPHYR_PID=$!
 
 # Xephyr hazır olana kadar bekle
@@ -266,6 +273,7 @@ REQUIRED_DIRS=(
     "${SHARE_DIR}/guest-init"
     "${SHARE_DIR}/welcome.py"
     "${SHARE_DIR}/safebox-guest-blocker"
+    "${SHARE_DIR}/seccomp_filter.py"
     "${SHARE_DIR}/guest-etc"
     "${SHARE_DIR}/guest-apps"
 )
@@ -293,7 +301,7 @@ BWRAP_ARGS=(
     --unshare-ipc
     --unshare-pid
     --unshare-uts
-    --unshare-cgroup
+    --unshare-cgroup-try
     --uid 1000
     --gid 1000
     --hostname safebox-sandbox
@@ -387,6 +395,17 @@ fi
 # X11 Socket
 BWRAP_ARGS+=(--bind "/tmp/.X11-unix/X${TARGET_DISP#:}" "/tmp/.X11-unix/X${TARGET_DISP#:}")
 BWRAP_ARGS+=(--info-fd 8)
+if [ "$SECCOMP" = "1" ]; then
+    if python3 "${SHARE_DIR}/seccomp_filter.py" -o "$SECCOMP_BPF" >> "$ENGINE_LOG" 2>&1; then
+        BWRAP_ARGS+=(--seccomp 7)
+        echo "[BİLGİ] Seccomp BPF filtresi etkinleştirildi." >> "$ENGINE_LOG"
+    else
+        echo "[HATA] Seccomp BPF filtresi oluşturulamadı!" >> "$ENGINE_LOG"
+        exit 109
+    fi
+else
+    echo "[UYARI] Seccomp BPF filtresi kullanıcı tercihiyle devre dışı bırakıldı." >> "$ENGINE_LOG"
+fi
 BWRAP_ARGS+=(--ro-bind "${SHARE_DIR}/guest-init" /home/safebox/.local/bin/guest-init)
 
 # Xephyr penceresi kapandığında (kullanıcı kapattığında) Sandbox'ı otomatik sonlandır
@@ -417,8 +436,14 @@ CMD_BWRAP=(bwrap "${BWRAP_ARGS[@]}" /home/safebox/.local/bin/guest-init)
 
 run_success=0
 if command -v systemd-run >/dev/null 2>&1; then
-    # systemd-run --scope fd 8'i kapatabileceği için --info-fd'yi bash içinden açıyoruz
-    CMD_SYSTEMD=(systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bash -c 'exec 8> "$1" && shift && exec "$@"' _ "$BWRAP_JSON" "${CMD_BWRAP[@]}")
+    # systemd-run --scope ekstra FD'leri kapatabileceği için --info-fd (8) ve --seccomp (7) bash içinden açılır
+    if [ "$SECCOMP" = "1" ]; then
+        # shellcheck disable=SC2016
+        CMD_SYSTEMD=(systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bash -c 'exec 8> "$1" && exec 7< "$2" && shift 2 && exec "$@"' _ "$BWRAP_JSON" "$SECCOMP_BPF" "${CMD_BWRAP[@]}")
+    else
+        # shellcheck disable=SC2016
+        CMD_SYSTEMD=(systemd-run --user --scope --unit=safebox-app.scope -p "MemoryMax=${RAM_GB}G" -p "CPUQuota=${CPU_QUOTA_VAL}%" bash -c 'exec 8> "$1" && shift && exec "$@"' _ "$BWRAP_JSON" "${CMD_BWRAP[@]}")
+    fi
 
     echo "[BİLGİ] systemd-run ile deneniyor..." >> "$ENGINE_LOG"
     set +e

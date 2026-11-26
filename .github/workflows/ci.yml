@@ -1,0 +1,32 @@
+name: SafeBox CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install runtime and lint dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bubblewrap \
+            libseccomp2 \
+            python3-gi \
+            gir1.2-gtk-3.0 \
+            appstream \
+            shellcheck
+
+      - name: Run shellcheck
+        run: |
+          shellcheck usr/bin/safebox usr/bin/safebox-core usr/bin/safebox-setup usr/share/safebox/guest-init usr/share/safebox/safebox-guest-blocker
+
+      - name: Run automated test suite
+        run: python3 -m unittest discover -s tests -v

@@ -2,6 +2,7 @@ usr/bin/safebox /usr/bin/
 usr/bin/safebox-core /usr/bin/
 usr/bin/safebox-setup /usr/bin/
 usr/share/safebox/safebox_gui.py /usr/share/safebox/
+usr/share/safebox/seccomp_filter.py /usr/share/safebox/
 usr/share/safebox/welcome.py /usr/share/safebox/
 usr/share/safebox/guest-init /usr/share/safebox/
 usr/share/safebox/safebox-guest-blocker /usr/share/safebox/

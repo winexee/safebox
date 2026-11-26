@@ -51,7 +51,7 @@ gtk-font-name="Sans 10"
 EOF
 
 # Host izolasyonunu sağlamak için sahte (mock) bir System DBus başlat (Cinnamon çökmesini engeller)
-# --fork soket dinlemeye hazır olana kadar bekler (race condition önlenir)
+# --session yerine özel adres ile başlatılır; --fork soket dinlemeye hazır olana kadar bekler
 mkdir -p /run/dbus
 dbus-daemon --session --address=unix:path=/run/dbus/system_bus_socket --fork --nopidfile --syslog-only
 

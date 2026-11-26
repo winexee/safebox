@@ -97,12 +97,15 @@ class SafeBoxGUI(Gtk.Window):
         lbl1.set_xalign(0)
         lbl2 = Gtk.Label(label="• Gerçek Donanım Sınırı: Linux cgroup v2 (MemoryMax & CPUQuota)")
         lbl2.set_xalign(0)
-        lbl3 = Gtk.Label(label="• Kimlik Yalıtımı: Statik passwd/group/shadow/machine-id ve sahte hostname")
+        lbl3 = Gtk.Label(label="• Sistem Çağrısı Koruması: Seccomp BPF filtresi & yalıtılmış Xephyr (-nolisten tcp)")
         lbl3.set_xalign(0)
+        lbl4 = Gtk.Label(label="• Kimlik Yalıtımı: Statik passwd/group/shadow/machine-id ve sahte hostname")
+        lbl4.set_xalign(0)
 
         info_box.pack_start(lbl1, False, False, 0)
         info_box.pack_start(lbl2, False, False, 0)
         info_box.pack_start(lbl3, False, False, 0)
+        info_box.pack_start(lbl4, False, False, 0)
         info_frame.add(info_box)
         tab_general.pack_start(info_frame, False, False, 0)
         notebook.append_page(tab_general, Gtk.Label(label="Genel Bakış"))
@@ -162,19 +165,36 @@ class SafeBoxGUI(Gtk.Window):
         notebook.append_page(tab_res, Gtk.Label(label="Kaynak ve Ekran"))
 
         # 3. İzinler ve İzolasyon
-        tab_perms = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        tab_perms = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         tab_perms.set_margin_top(12)
+
+        self.chk_seccomp = Gtk.CheckButton(label="Seccomp BPF Sistem Çağrısı Koruması (Önerilen)")
+        self.chk_seccomp.set_active(True)
+        seccomp_hint = Gtk.Label()
+        seccomp_hint.set_markup("<small>    ↳ Tehlikeli çekirdek/mount/namespace çağrılarını (unshare, bpf, kexec, io_uring, ptrace) engeller.</small>")
+        seccomp_hint.set_xalign(0)
 
         self.chk_net = Gtk.CheckButton(label="İnternet ve Ağ Erişimi (Ana sistem ağı paylaşılır)")
         self.chk_net.set_active(True)
         self.chk_audio = Gtk.CheckButton(label="Ses Desteği (PulseAudio / PipeWire Soketi)")
         self.chk_audio.set_active(True)
+        audio_hint = Gtk.Label()
+        audio_hint.set_markup("<small>    ↳ Uyarı: Ses soketi paylaşımı host ses akışına ve mikrofona erişim yüzeyi açar.</small>")
+        audio_hint.set_xalign(0)
+
         self.chk_share = Gtk.CheckButton(label="Paylaşılan Klasör (~/SafeBox-Paylasim Köprüsü)")
         self.chk_share.set_active(True)
+        share_hint = Gtk.Label()
+        share_hint.set_markup("<small>    ↳ Uyarı: Yalnızca ~/SafeBox-Paylasim dizini çift yönlü (okuma/yazma) bağlanır.</small>")
+        share_hint.set_xalign(0)
 
+        tab_perms.pack_start(self.chk_seccomp, False, False, 0)
+        tab_perms.pack_start(seccomp_hint, False, False, 0)
         tab_perms.pack_start(self.chk_net, False, False, 0)
         tab_perms.pack_start(self.chk_audio, False, False, 0)
+        tab_perms.pack_start(audio_hint, False, False, 0)
         tab_perms.pack_start(self.chk_share, False, False, 0)
+        tab_perms.pack_start(share_hint, False, False, 0)
         notebook.append_page(tab_perms, Gtk.Label(label="İzinler ve İzolasyon"))
 
         # 4. Konsol ve Günlük
@@ -304,6 +324,7 @@ class SafeBoxGUI(Gtk.Window):
             expected_ram_gb = int(ram_text.split()[0])
             expected_cpu_cores = int(cpu_text.split()[0])
             net_shared = self.chk_net.get_active()
+            seccomp_enabled = self.chk_seccomp.get_active()
 
             self.cmd_entry.set_sensitive(False)
             self.btn_run.set_sensitive(False)
@@ -311,7 +332,7 @@ class SafeBoxGUI(Gtk.Window):
 
             threading.Thread(
                 target=self._run_diagnostics_thread,
-                args=(is_ultra, expected_ram_gb, expected_cpu_cores, net_shared),
+                args=(is_ultra, expected_ram_gb, expected_cpu_cores, net_shared, seccomp_enabled),
                 daemon=True,
             ).start()
         else:
@@ -341,311 +362,344 @@ class SafeBoxGUI(Gtk.Window):
             else:
                 self.append_log("Geçersiz komut. Komutları görmek için 'help' yazın.")
 
-    def _run_diagnostics_thread(self, is_ultra, expected_ram_gb, expected_cpu_cores, net_shared):
+    def _run_diagnostics_thread(self, is_ultra, expected_ram_gb, expected_cpu_cores, net_shared, seccomp_enabled=True):
         def log(msg):
             GLib.idle_add(self.append_log, msg)
+
+        def reenable_console():
+            self.cmd_entry.set_sensitive(True)
+            self.btn_run.set_sensitive(True)
 
         tests_passed = 0
         tests_total = 0
         tests_unknown = 0
         errors = []
 
-        # Test 1: RootFS kontrolü
-        tests_total += 1
-        if (
-            os.path.exists("/var/lib/safebox/rootfs/.safebox-rootfs-complete")
-            and os.path.exists("/var/lib/safebox/rootfs/usr/bin/cinnamon")
-            and os.path.exists("/var/lib/safebox/rootfs/usr/bin/nemo")
-        ):
-            log("✓ RootFS: Tam ve eksiksiz kurulu.")
-            tests_passed += 1
-        else:
-            msg = "✗ RootFS: Eksik veya hatalı kurulum (sudo safebox-setup gerekli)"
-            log(msg)
-            errors.append(msg)
-
-        # Test 2: SafeBox-Core Çalışıyor mu?
-        tests_total += 1
         try:
-            current_user = getpass.getuser()
-            sandbox_pid = self._find_running_sandbox_pid(retries=10)
-
-            if sandbox_pid:
-                log(f"✓ Arka Plan Süreci: Aktif (PID: {sandbox_pid})")
+            # Test 1: RootFS kontrolü
+            tests_total += 1
+            if (
+                os.path.exists("/var/lib/safebox/rootfs/.safebox-rootfs-complete")
+                and os.path.exists("/var/lib/safebox/rootfs/usr/bin/cinnamon")
+                and os.path.exists("/var/lib/safebox/rootfs/usr/bin/nemo")
+            ):
+                log("✓ RootFS: Tam ve eksiksiz kurulu.")
                 tests_passed += 1
+            else:
+                msg = "✗ RootFS: Eksik veya hatalı kurulum (sudo safebox-setup gerekli)"
+                log(msg)
+                errors.append(msg)
 
-                # Test 3: Cgroup Limiti
-                tests_total += 1
-                try:
-                    with open(f"/proc/{sandbox_pid}/cgroup", "r", encoding="utf-8") as cgf:
-                        cgroup_path = cgf.read()
+            # Test 2: SafeBox-Core Çalışıyor mu?
+            tests_total += 1
+            try:
+                current_user = getpass.getuser()
+                sandbox_pid = self._find_running_sandbox_pid(retries=10)
 
-                    if "safebox-app.scope" in cgroup_path:
-                        log("✓ Kaynak Sınırları: Süreç izole edilmiş Cgroup içinde.")
-                        tests_passed += 1
+                if sandbox_pid:
+                    log(f"✓ Arka Plan Süreci: Aktif (PID: {sandbox_pid})")
+                    tests_passed += 1
 
-                        if is_ultra:
-                            tests_total += 2
-                            try:
-                                cgroup_lines = [line.strip() for line in cgroup_path.splitlines() if line.strip()]
-                                v2_lines = [line for line in cgroup_lines if line.startswith("0::")]
-                                if v2_lines:
-                                    real_cgroup = "/sys/fs/cgroup" + v2_lines[0][3:]
-                                else:
-                                    real_cgroup = "/sys/fs/cgroup/unified" + cgroup_lines[0].split(":", 2)[-1]
+                    # Test 3: Cgroup Limiti
+                    tests_total += 1
+                    try:
+                        with open(f"/proc/{sandbox_pid}/cgroup", "r", encoding="utf-8") as cgf:
+                            cgroup_path = cgf.read()
 
-                                with open(f"{real_cgroup}/memory.max", "r", encoding="utf-8") as mf:
-                                    actual_mem = mf.read().strip()
+                        if "safebox-app.scope" in cgroup_path:
+                            log("✓ Kaynak Sınırları: Süreç izole edilmiş Cgroup içinde.")
+                            tests_passed += 1
 
-                                with open(f"{real_cgroup}/cpu.max", "r", encoding="utf-8") as cf:
-                                    actual_cpu = cf.read().strip().split()[0]
+                            if is_ultra:
+                                tests_total += 2
+                                try:
+                                    cgroup_lines = [line.strip() for line in cgroup_path.splitlines() if line.strip()]
+                                    v2_lines = [line for line in cgroup_lines if line.startswith("0::")]
+                                    if v2_lines:
+                                        real_cgroup = "/sys/fs/cgroup" + v2_lines[0][3:]
+                                    else:
+                                        real_cgroup = "/sys/fs/cgroup/unified" + cgroup_lines[0].split(":", 2)[-1]
 
-                                expected_ram = str(expected_ram_gb * 1024**3)
-                                host_cores = os.cpu_count() or expected_cpu_cores
-                                capped_cores = min(expected_cpu_cores, host_cores)
-                                expected_cpu = str(capped_cores * 100000)
+                                    with open(f"{real_cgroup}/memory.max", "r", encoding="utf-8") as mf:
+                                        actual_mem = mf.read().strip()
 
-                                if actual_mem == expected_ram or (actual_mem == "max" and expected_ram == "0"):
-                                    log(f"  ✓ Cgroup RAM: Seçilen değer uygulandı (memory.max={actual_mem})")
-                                    tests_passed += 1
-                                else:
-                                    log(f"  ✗ Cgroup RAM: HATALI! Beklenen: {expected_ram}, Uygulanan: {actual_mem}")
-                                    errors.append("Cgroup RAM limiti hatalı.")
+                                    with open(f"{real_cgroup}/cpu.max", "r", encoding="utf-8") as cf:
+                                        actual_cpu = cf.read().strip().split()[0]
 
-                                if actual_cpu == expected_cpu or (actual_cpu == "max" and expected_cpu == "0"):
-                                    log(f"  ✓ Cgroup CPU: Seçilen değer uygulandı (cpu.max={actual_cpu})")
-                                    tests_passed += 1
-                                else:
-                                    log(f"  ✗ Cgroup CPU: HATALI! Beklenen: {expected_cpu}, Uygulanan: {actual_cpu}")
-                                    errors.append("Cgroup CPU limiti hatalı.")
-
-                            except Exception as e:
-                                log(f"  ⚠ Cgroup Limitleri doğrulanamadı: {e}")
-                                tests_unknown += 2
-                                errors.append("Cgroup doğrulama hatası.")
-
-                            tests_total += 1
-                            try:
-                                with open(f"/proc/{sandbox_pid}/status", "r", encoding="utf-8") as sf:
-                                    status_lines = sf.readlines()
-                                cpus_allowed = [
-                                    line.split(":")[1].strip()
-                                    for line in status_lines
-                                    if line.startswith("Cpus_allowed_list")
-                                ]
-                                if cpus_allowed:
+                                    expected_ram = str(expected_ram_gb * 1024**3)
                                     host_cores = os.cpu_count() or expected_cpu_cores
                                     capped_cores = min(expected_cpu_cores, host_cores)
-                                    expected_affinity = f"0-{capped_cores - 1}" if capped_cores > 1 else "0"
-                                    if cpus_allowed[0] == expected_affinity:
-                                        log(f"  ✓ CPU Affinity: Çalışabilir CPU'lar tam doğrulandı ({cpus_allowed[0]})")
+                                    expected_cpu = str(capped_cores * 100000)
+
+                                    if actual_mem == expected_ram or (actual_mem == "max" and expected_ram == "0"):
+                                        log(f"  ✓ Cgroup RAM: Seçilen değer uygulandı (memory.max={actual_mem})")
                                         tests_passed += 1
                                     else:
-                                        log(f"  ✗ CPU Affinity Sızıntısı: Beklenen: {expected_affinity}, Bulunan: {cpus_allowed[0]}")
-                                        errors.append(f"CPU Affinity Yanlış: Beklenen {expected_affinity}, Bulunan {cpus_allowed[0]}")
-                                else:
-                                    log("  ⚠ CPU Affinity: Cpus_allowed_list bulunamadı.")
+                                        log(f"  ✗ Cgroup RAM: HATALI! Beklenen: {expected_ram}, Uygulanan: {actual_mem}")
+                                        errors.append("Cgroup RAM limiti hatalı.")
+
+                                    if actual_cpu == expected_cpu or (actual_cpu == "max" and expected_cpu == "0"):
+                                        log(f"  ✓ Cgroup CPU: Seçilen değer uygulandı (cpu.max={actual_cpu})")
+                                        tests_passed += 1
+                                    else:
+                                        log(f"  ✗ Cgroup CPU: HATALI! Beklenen: {expected_cpu}, Uygulanan: {actual_cpu}")
+                                        errors.append("Cgroup CPU limiti hatalı.")
+
+                                except Exception as e:
+                                    log(f"  ⚠ Cgroup Limitleri doğrulanamadı: {e}")
+                                    tests_unknown += 2
+                                    errors.append("Cgroup doğrulama hatası.")
+
+                                tests_total += 1
+                                try:
+                                    with open(f"/proc/{sandbox_pid}/status", "r", encoding="utf-8") as sf:
+                                        status_lines = sf.readlines()
+                                    cpus_allowed = [
+                                        line.split(":")[1].strip()
+                                        for line in status_lines
+                                        if line.startswith("Cpus_allowed_list")
+                                    ]
+                                    if cpus_allowed:
+                                        host_cores = os.cpu_count() or expected_cpu_cores
+                                        capped_cores = min(expected_cpu_cores, host_cores)
+                                        expected_affinity = f"0-{capped_cores - 1}" if capped_cores > 1 else "0"
+                                        if cpus_allowed[0] == expected_affinity:
+                                            log(f"  ✓ CPU Affinity: Çalışabilir CPU'lar tam doğrulandı ({cpus_allowed[0]})")
+                                            tests_passed += 1
+                                        else:
+                                            log(f"  ✗ CPU Affinity Sızıntısı: Beklenen: {expected_affinity}, Bulunan: {cpus_allowed[0]}")
+                                            errors.append(f"CPU Affinity Yanlış: Beklenen {expected_affinity}, Bulunan {cpus_allowed[0]}")
+                                    else:
+                                        log("  ⚠ CPU Affinity: Cpus_allowed_list bulunamadı.")
+                                        tests_unknown += 1
+                                except Exception as e:
+                                    log(f"  ⚠ CPU Affinity okunamadı: {e}")
                                     tests_unknown += 1
-                            except Exception as e:
-                                log(f"  ⚠ CPU Affinity okunamadı: {e}")
-                                tests_unknown += 1
-                    else:
-                        msg = f"✗ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})"
+                        else:
+                            msg = f"✗ Kaynak Sınırları: Süreç varsayılan Cgroup'ta! ({cgroup_path.strip()})"
+                            log(msg)
+                            errors.append(msg)
+                    except Exception as e:
+                        msg = f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})"
                         log(msg)
                         errors.append(msg)
-                except Exception as e:
-                    msg = f"⚠ Kaynak Sınırları: Cgroup doğrulanamadı ({e})"
-                    if is_ultra:
-                        log(msg)
-                    errors.append(msg)
-                    tests_unknown += 1
+                        tests_unknown += 1
 
-                # Namespace ve Filesystem Testleri (Sadece Ultra)
-                if is_ultra:
-                    # 1. Namespaces
-                    for ns, name in [("mnt", "Mount"), ("pid", "PID"), ("uts", "UTS"), ("ipc", "IPC"), ("user", "USER"), ("net", "Network")]:
+                    # Namespace ve Filesystem Testleri (Sadece Ultra)
+                    if is_ultra:
+                        # 1. Namespaces
+                        for ns, name in [("mnt", "Mount"), ("pid", "PID"), ("uts", "UTS"), ("ipc", "IPC"), ("user", "USER"), ("net", "Network")]:
+                            tests_total += 1
+                            try:
+                                h = os.readlink(f"/proc/self/ns/{ns}")
+                                g_proc = subprocess.run(["readlink", f"/proc/{sandbox_pid}/ns/{ns}"], capture_output=True, text=True, timeout=2)
+                                g = g_proc.stdout.strip() if g_proc.returncode == 0 else ""
+
+                                if not g:
+                                    log(f"  ⚠ {name} Namespace: Okunamadı!")
+                                    tests_unknown += 1
+                                    errors.append(f"{name} Namespace okunamadı.")
+                                    continue
+
+                                if ns == "net" and net_shared:
+                                    log(f"  ✓ {name} Namespace: PASS - Ağ bilerek paylaşıldı (NET=1).")
+                                    tests_passed += 1
+                                elif h != g:
+                                    log(f"  ✓ {name} Namespace: İzole (Guest: {g.split(':')[-1][:-1]})")
+                                    tests_passed += 1
+                                else:
+                                    suffix = " (KAPALI OLMASINA RAĞMEN)" if ns == "net" else ""
+                                    log(f"  ✗ {name} Namespace: HOST İLE PAYLAŞILMIŞ!{suffix}")
+                                    errors.append(f"{name} Namespace izole edilmemiş!")
+                            except Exception as e:
+                                log(f"  ⚠ {name} Namespace: Kontrol Hatası! ({e})")
+                                tests_unknown += 1
+                                errors.append(f"{name} Namespace hata: {e}")
+
+                        # 2. Filesystem Mountinfo (RootFS ve sızıntı kontrolü)
                         tests_total += 1
                         try:
-                            h = os.readlink(f"/proc/self/ns/{ns}")
-                            g_proc = subprocess.run(["readlink", f"/proc/{sandbox_pid}/ns/{ns}"], capture_output=True, text=True, timeout=2)
-                            g = g_proc.stdout.strip() if g_proc.returncode == 0 else ""
+                            with open(f"/proc/{sandbox_pid}/mountinfo", "r", encoding="utf-8") as mf:
+                                mountinfo = mf.read()
 
-                            if not g:
-                                log(f"  ⚠ {name} Namespace: Okunamadı!")
-                                tests_unknown += 1
-                                errors.append(f"{name} Namespace okunamadı.")
-                                continue
+                            leaks = [f"/home/{current_user}", "/root", "/mnt", "/media"]
+                            leak_found = False
+                            for line in mountinfo.splitlines():
+                                parts = line.split()
+                                if len(parts) >= 5:
+                                    root_path = parts[3]
+                                    mount_point = parts[4]
+                                    for leak in leaks:
+                                        if root_path in (leak, f"{leak}/") or mount_point in (leak, f"{leak}/"):
+                                            leak_found = True
+                                            log(f"  ✗ Mountinfo: Host {leak} dizini SIZMIŞ! ({root_path} -> {mount_point})")
+                                            errors.append(f"Host {leak} sızıntısı!")
 
-                            if ns == "net" and net_shared:
-                                log(f"  ✓ {name} Namespace: PASS - Ağ bilerek paylaşıldı (NET=1).")
+                            if not leak_found:
+                                log("  ✓ Mountinfo: Host özel dizinleri (/home, /root, vb.) izole.")
                                 tests_passed += 1
-                            elif h != g:
-                                log(f"  ✓ {name} Namespace: İzole (Guest: {g.split(':')[-1][:-1]})")
-                                tests_passed += 1
-                            else:
-                                suffix = " (KAPALI OLMASINA RAĞMEN)" if ns == "net" else ""
-                                log(f"  ✗ {name} Namespace: HOST İLE PAYLAŞILMIŞ!{suffix}")
-                                errors.append(f"{name} Namespace izole edilmemiş!")
                         except Exception as e:
-                            log(f"  ⚠ {name} Namespace: Kontrol Hatası! ({e})")
+                            log(f"  ⚠ Mountinfo İzolasyon: Kontrol edilemedi ({e})")
                             tests_unknown += 1
-                            errors.append(f"{name} Namespace hata: {e}")
+                            errors.append(f"Mountinfo testi hata: {e}")
 
-                    # 2. Filesystem Mountinfo (RootFS ve sızıntı kontrolü)
-                    tests_total += 1
-                    try:
-                        with open(f"/proc/{sandbox_pid}/mountinfo", "r", encoding="utf-8") as mf:
-                            mountinfo = mf.read()
+                        tests_total += 1
+                        try:
+                            with open(f"/proc/{sandbox_pid}/mountinfo", "r", encoding="utf-8") as mf:
+                                mounts = mf.readlines()
 
-                        leaks = [f"/home/{current_user}", "/root", "/mnt", "/media"]
-                        leak_found = False
-                        for line in mountinfo.splitlines():
-                            parts = line.split()
-                            if len(parts) >= 5:
-                                root_path = parts[3]
-                                mount_point = parts[4]
-                                for leak in leaks:
-                                    if root_path in (leak, f"{leak}/") or mount_point in (leak, f"{leak}/"):
-                                        leak_found = True
-                                        log(f"  ✗ Mountinfo: Host {leak} dizini SIZMIŞ! ({root_path} -> {mount_point})")
-                                        errors.append(f"Host {leak} sızıntısı!")
-
-                        if not leak_found:
-                            log("  ✓ Mountinfo: Host özel dizinleri (/home, /root, vb.) izole.")
-                            tests_passed += 1
-                    except Exception as e:
-                        log(f"  ⚠ Mountinfo İzolasyon: Kontrol edilemedi ({e})")
-                        tests_unknown += 1
-                        errors.append(f"Mountinfo testi hata: {e}")
-
-                    tests_total += 1
-                    try:
-                        with open(f"/proc/{sandbox_pid}/mountinfo", "r", encoding="utf-8") as mf:
-                            mounts = mf.readlines()
-
-                        root_mounts = [m.split() for m in mounts if len(m.split()) >= 5 and m.split()[4] == "/"]
-                        if root_mounts and "/var/lib/safebox/rootfs" in root_mounts[0][3]:
-                            log("  ✓ RootFS Mount: Root (/) mount tablosu doğrulandı.")
-                            tests_passed += 1
-                        else:
-                            log("  ✗ RootFS Mount: Hatalı izolasyon veya sızıntı var!")
-                            errors.append("Root mount izolasyonu başarısız.")
-                    except Exception as e:
-                        log(f"  ⚠ RootFS Mount: Kontrol edilemedi ({e})")
-                        tests_unknown += 1
-                        errors.append(f"Root mount testi hata: {e}")
-
-                    # 3. Gerçek Dosya Erişimi (Host /home ve Cihaz sızıntı testi)
-                    tests_total += 1
-                    try:
-                        home_access = subprocess.run(
-                            ["nsenter", "-m", "-U", "-t", str(sandbox_pid), "ls", f"/home/{current_user}"],
-                            capture_output=True,
-                            text=True,
-                            timeout=3,
-                        )
-                        if "nsenter:" in home_access.stderr:
-                            log(f"  ⚠ Filesystem /home: nsenter çalıştırılamadı ({home_access.stderr.strip()})")
-                            tests_unknown += 1
-                        elif home_access.returncode != 0:
-                            log(f"  ✓ Filesystem: Guest içinden /home/{current_user} erişilemez durumda.")
-                            tests_passed += 1
-                        else:
-                            log(f"  ✗ Filesystem: Guest içinden /home/{current_user} okunabiliyor!")
-                            errors.append("Gerçek /home erişim sızıntısı!")
-                    except Exception as e:
-                        log(f"  ⚠ Filesystem /home: Gerçek erişim testi yapılamadı ({e})")
-                        tests_unknown += 1
-
-                    tests_total += 1
-                    try:
-                        dev_proc = subprocess.run(
-                            ["nsenter", "-m", "-U", "-t", str(sandbox_pid), "ls", "/dev"],
-                            capture_output=True,
-                            text=True,
-                            timeout=3,
-                        )
-                        if dev_proc.returncode != 0:
-                            log(f"  ⚠ Filesystem /dev: okunamadı ({dev_proc.stderr.strip()})")
-                            tests_unknown += 1
-                        else:
-                            dev_access = dev_proc.stdout
-                            host_devs = []
-                            for bd in glob.glob("/sys/block/*"):
-                                bd_name = os.path.basename(bd)
-                                if not bd_name.startswith("loop") and not bd_name.startswith("ram"):
-                                    host_devs.append(bd_name)
-                            if os.path.exists("/dev/dri"):
-                                host_devs.append("dri")
-
-                            dev_leak = any(hd in dev_access.split() for hd in host_devs)
-                            if dev_leak:
-                                log("  ✗ Filesystem: /dev altında host donanımları (disk/gpu) okunabiliyor!")
-                                errors.append("/dev gerçek erişim izolasyonu başarısız!")
-                            else:
-                                log("  ✓ Filesystem: /dev izole; host disk/gpu cihazları görünmüyor.")
-                                tests_passed += 1
-                    except Exception as e:
-                        log(f"  ⚠ Filesystem /dev: Gerçek erişim testi yapılamadı ({e})")
-                        tests_unknown += 1
-
-                    # 4. Hostname
-                    tests_total += 1
-                    try:
-                        host_proc = subprocess.run(
-                            ["nsenter", "-m", "-u", "-U", "-t", str(sandbox_pid), "cat", "/proc/sys/kernel/hostname"],
-                            capture_output=True,
-                            text=True,
-                            timeout=3,
-                        )
-                        if host_proc.returncode != 0:
-                            log(f"  ⚠ UTS: Hostname okunamadı ({host_proc.stderr.strip()})")
-                            tests_unknown += 1
-                        else:
-                            hostname_check = host_proc.stdout.strip()
-                            if hostname_check == "safebox-sandbox":
-                                log("  ✓ UTS: Hostname 'safebox-sandbox' olarak doğrulandı.")
+                            root_mounts = [m.split() for m in mounts if len(m.split()) >= 5 and m.split()[4] == "/"]
+                            if root_mounts and "/var/lib/safebox/rootfs" in root_mounts[0][3]:
+                                log("  ✓ RootFS Mount: Root (/) mount tablosu doğrulandı.")
                                 tests_passed += 1
                             else:
-                                log(f"  ✗ UTS: Hostname sızıntısı! Beklenen: safebox-sandbox, Bulunan: '{hostname_check}'")
-                                errors.append(f"Hostname sızıntısı: {hostname_check}")
-                    except Exception as e:
-                        log(f"  ⚠ UTS: Hostname kontrol edilemedi ({e})")
-                        tests_unknown += 1
-            else:
-                log("✗ Sandbox Runtime: FAIL (Çalışan bir oturum yok)")
-                errors.append("Sandbox başlatılamadı.")
-                if is_ultra:
-                    log("  ⚠ Cgroup: UNKNOWN")
-                    log("  ⚠ Namespace: UNKNOWN")
-                    log("  ⚠ Filesystem: UNKNOWN")
-                    log("  ⚠ Hostname: UNKNOWN")
-                    tests_total += 15
-                    tests_unknown += 15
-        except Exception as e:
-            msg = f"✗ Arka Plan Kontrolü hatası: {e}"
-            if is_ultra:
+                                log("  ✗ RootFS Mount: Hatalı izolasyon veya sızıntı var!")
+                                errors.append("Root mount izolasyonu başarısız.")
+                        except Exception as e:
+                            log(f"  ⚠ RootFS Mount: Kontrol edilemedi ({e})")
+                            tests_unknown += 1
+                            errors.append(f"Root mount testi hata: {e}")
+
+                        # 3. Gerçek Dosya Erişimi (Host /home ve Cihaz sızıntı testi)
+                        tests_total += 1
+                        try:
+                            home_access = subprocess.run(
+                                ["nsenter", "-m", "-U", "-t", str(sandbox_pid), "ls", f"/home/{current_user}"],
+                                capture_output=True,
+                                text=True,
+                                timeout=3,
+                            )
+                            if "nsenter:" in home_access.stderr:
+                                log(f"  ⚠ Filesystem /home: nsenter çalıştırılamadı ({home_access.stderr.strip()})")
+                                tests_unknown += 1
+                            elif home_access.returncode != 0:
+                                log(f"  ✓ Filesystem: Guest içinden /home/{current_user} erişilemez durumda.")
+                                tests_passed += 1
+                            else:
+                                log(f"  ✗ Filesystem: Guest içinden /home/{current_user} okunabiliyor!")
+                                errors.append("Gerçek /home erişim sızıntısı!")
+                        except Exception as e:
+                            log(f"  ⚠ Filesystem /home: Gerçek erişim testi yapılamadı ({e})")
+                            tests_unknown += 1
+
+                        tests_total += 1
+                        try:
+                            dev_proc = subprocess.run(
+                                ["nsenter", "-m", "-U", "-t", str(sandbox_pid), "ls", "/dev"],
+                                capture_output=True,
+                                text=True,
+                                timeout=3,
+                            )
+                            if dev_proc.returncode != 0:
+                                log(f"  ⚠ Filesystem /dev: okunamadı ({dev_proc.stderr.strip()})")
+                                tests_unknown += 1
+                            else:
+                                dev_access = dev_proc.stdout
+                                host_devs = []
+                                for bd in glob.glob("/sys/block/*"):
+                                    bd_name = os.path.basename(bd)
+                                    if not bd_name.startswith("loop") and not bd_name.startswith("ram"):
+                                        host_devs.append(bd_name)
+                                if os.path.exists("/dev/dri"):
+                                    host_devs.append("dri")
+
+                                dev_leak = any(hd in dev_access.split() for hd in host_devs)
+                                if dev_leak:
+                                    log("  ✗ Filesystem: /dev altında host donanımları (disk/gpu) okunabiliyor!")
+                                    errors.append("/dev gerçek erişim izolasyonu başarısız!")
+                                else:
+                                    log("  ✓ Filesystem: /dev izole; host disk/gpu cihazları görünmüyor.")
+                                    tests_passed += 1
+                        except Exception as e:
+                            log(f"  ⚠ Filesystem /dev: Gerçek erişim testi yapılamadı ({e})")
+                            tests_unknown += 1
+
+                        # 4. Hostname
+                        tests_total += 1
+                        try:
+                            host_proc = subprocess.run(
+                                ["nsenter", "-m", "-u", "-U", "-t", str(sandbox_pid), "cat", "/proc/sys/kernel/hostname"],
+                                capture_output=True,
+                                text=True,
+                                timeout=3,
+                            )
+                            if host_proc.returncode != 0:
+                                log(f"  ⚠ UTS: Hostname okunamadı ({host_proc.stderr.strip()})")
+                                tests_unknown += 1
+                            else:
+                                hostname_check = host_proc.stdout.strip()
+                                if hostname_check == "safebox-sandbox":
+                                    log("  ✓ UTS: Hostname 'safebox-sandbox' olarak doğrulandı.")
+                                    tests_passed += 1
+                                else:
+                                    log(f"  ✗ UTS: Hostname sızıntısı! Beklenen: safebox-sandbox, Bulunan: '{hostname_check}'")
+                                    errors.append(f"Hostname sızıntısı: {hostname_check}")
+                        except Exception as e:
+                            log(f"  ⚠ UTS: Hostname kontrol edilemedi ({e})")
+                            tests_unknown += 1
+
+                        # 5. Seccomp BPF & NoNewPrivs
+                        tests_total += 2
+                        try:
+                            with open(f"/proc/{sandbox_pid}/status", "r", encoding="utf-8") as sf:
+                                status_map = {}
+                                for line in sf:
+                                    if ":" in line:
+                                        k, v = line.split(":", 1)
+                                        status_map[k.strip()] = v.strip()
+
+                            no_new_privs = status_map.get("NoNewPrivs")
+                            if no_new_privs == "1":
+                                log("  ✓ Güvenlik Bayrağı: NoNewPrivs=1 etkin.")
+                                tests_passed += 1
+                            else:
+                                log(f"  ✗ Güvenlik Bayrağı: NoNewPrivs beklenmedik değer ({no_new_privs})")
+                                errors.append(f"NoNewPrivs={no_new_privs}")
+
+                            seccomp_mode = status_map.get("Seccomp")
+                            if not seccomp_enabled:
+                                log(f"  ✓ Seccomp BPF: PASS - Kullanıcı tercihiyle devre dışı (Seccomp={seccomp_mode}).")
+                                tests_passed += 1
+                            elif seccomp_mode == "2":
+                                log("  ✓ Seccomp BPF: Filtre etkin (Seccomp=2 / FILTER).")
+                                tests_passed += 1
+                            else:
+                                log(f"  ✗ Seccomp BPF: Filtre etkin değil! (Seccomp={seccomp_mode})")
+                                errors.append(f"Seccomp etkin değil (Seccomp={seccomp_mode})")
+                        except Exception as e:
+                            log(f"  ⚠ Seccomp / NoNewPrivs doğrulanamadı ({e})")
+                            tests_unknown += 2
+                else:
+                    log("✗ Sandbox Runtime: FAIL (Çalışan bir oturum yok)")
+                    errors.append("Sandbox başlatılamadı.")
+                    if is_ultra:
+                        log("  ⚠ Cgroup: UNKNOWN")
+                        log("  ⚠ Namespace: UNKNOWN")
+                        log("  ⚠ Filesystem: UNKNOWN")
+                        log("  ⚠ Hostname: UNKNOWN")
+                        log("  ⚠ Seccomp / NoNewPrivs: UNKNOWN")
+                        tests_total += 17
+                        tests_unknown += 17
+            except Exception as e:
+                msg = f"✗ Arka Plan Kontrolü hatası: {e}"
                 log(msg)
-            errors.append(msg)
-            tests_unknown += 1
+                errors.append(msg)
+                tests_unknown += 1
 
-        # Sonuç
-        if tests_total > 0:
-            tests_failed = tests_total - tests_passed - tests_unknown
-            log(f"\n[SONUÇ] PASS: {tests_passed} | FAIL: {tests_failed} | UNKNOWN: {tests_unknown} (Toplam: {tests_total} Test)")
-            if is_ultra and errors:
-                log("--- Ultra Detaylı Hata Listesi ---")
-                for err in errors:
-                    log(err)
-                log("----------------------------------")
-        else:
-            log("\n[SONUÇ] Test yapılamadı.")
+            # Sonuç
+            if tests_total > 0:
+                tests_failed = tests_total - tests_passed - tests_unknown
+                log(f"\n[SONUÇ] PASS: {tests_passed} | FAIL: {tests_failed} | UNKNOWN: {tests_unknown} (Toplam: {tests_total} Test)")
+                if is_ultra and errors:
+                    log("--- Ultra Detaylı Hata Listesi ---")
+                    for err in errors:
+                        log(err)
+                    log("----------------------------------")
+            else:
+                log("\n[SONUÇ] Test yapılamadı.")
 
-        def reenable_console():
-            self.cmd_entry.set_sensitive(True)
-            self.btn_run.set_sensitive(True)
-
-        GLib.idle_add(reenable_console)
+        finally:
+            GLib.idle_add(reenable_console)
 
     def on_start_sandbox(self, widget):
         ram_text = self.ram_combo.get_active_text()
@@ -660,13 +714,14 @@ class SafeBoxGUI(Gtk.Window):
         net = "1" if self.chk_net.get_active() else "0"
         audio = "1" if self.chk_audio.get_active() else "0"
         share = "1" if self.chk_share.get_active() else "0"
+        seccomp = "1" if self.chk_seccomp.get_active() else "0"
 
         self.btn_start.set_sensitive(False)
-        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}...")
+        self.append_log(f"[BAŞLATILIYOR] RAM={ram}GB, CPU={cpu}, Ekran={res}, Seccomp={seccomp}...")
 
         def run_thread():
             engine_path = resolve_bin("safebox-core")
-            cmd = [engine_path, ram, cpu, res, share, audio, net]
+            cmd = [engine_path, ram, cpu, res, share, audio, net, seccomp]
             try:
                 proc = subprocess.run(cmd)
                 rc = proc.returncode
@@ -708,7 +763,7 @@ class SafeBoxGUI(Gtk.Window):
                 self.append_log("[BİLGİ] RootFS kurulumu başlatılıyor...")
 
                 def setup_thread():
-                    setup_cmd = ["pkexec", resolve_bin("safebox-setup")]
+                    setup_cmd = ["pkexec", resolve_bin("safebox-setup"), "--yes"]
                     try:
                         s_proc = subprocess.run(setup_cmd)
                         rc = s_proc.returncode

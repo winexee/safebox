@@ -13,20 +13,6 @@ base: core24
 apps:
   safebox:
     command: usr/bin/safebox
-    extensions: [gnome]
-    plugs:
-      - home
-      - x11
-      - wayland
-      - desktop
-      - desktop-legacy
-      - unity7
-      - opengl
-      - network
-      - network-bind
-      - audio-playback
-      - process-control
-      - system-observe
 
 parts:
   safebox-app:
@@ -36,6 +22,7 @@ parts:
       - python3-gi
       - gir1.2-gtk-3.0
       - bubblewrap
+      - libseccomp2
       - librsvg2-common
       - xserver-xephyr
       - x11-utils
@@ -44,7 +31,12 @@ parts:
       - pulseaudio-utils
     prime:
       - -debian
+      - -docs
+      - -tests
+      - -.github
       - -scratch
+      - -snap
       - -BUGFIX_ANALYSIS.md
       - -README.md
+      - -README.en.md
       - -LICENSE
